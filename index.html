@@ -1,0 +1,3306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Data Odyssey — ML Aptitude Quiz</title>
+<meta property="og:title" content="Data Odyssey — ML Aptitude Quiz">
+<meta property="og:description" content="10 interactive ML concepts with live visualizations. Built in pure JavaScript. Test your data science intuition.">
+<meta property="og:type" content="website">
+<meta name="description" content="Interactive ML education quiz. No frameworks. Pure JavaScript.">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+/* ── Reset & Base ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:      #0d0017;
+  --surface: #1a0a2e;
+  --gold:    #f7d51d;
+  --green:   #5dde24;
+  --red:     #e53232;
+  --blue:    #5ee7ff;
+  --purple:  #c084fc;
+  --stone:   #828282;
+  --dark:    #000000;
+  --white:   #ffffff;
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--white);
+  font-family: 'Press Start 2P', monospace;
+  overflow-x: hidden;
+}
+
+/* ── Pixel Box System ── */
+.pixel-box {
+  border: 4px solid #000;
+  box-shadow:
+    inset -4px -4px 0 rgba(0,0,0,0.7),
+    inset 4px 4px 0 rgba(255,255,255,0.25),
+    0 6px 0 #000;
+  image-rendering: pixelated;
+}
+
+.pixel-box:active {
+  box-shadow:
+    inset -4px -4px 0 rgba(0,0,0,0.7),
+    inset 4px 4px 0 rgba(255,255,255,0.25);
+  transform: translateY(6px);
+}
+
+/* ── Scanlines overlay ── */
+body::after {
+  content: '';
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0,0,0,0.12) 0px,
+    rgba(0,0,0,0.12) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* ── Animations ── */
+@keyframes blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+@keyframes floatCoin {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-12px) rotate(10deg); }
+}
+@keyframes goldGlow {
+  0%, 100% { text-shadow: 0 0 8px var(--gold), 0 0 20px var(--gold); }
+  50% { text-shadow: 0 0 24px var(--gold), 0 0 60px var(--gold), 0 0 100px #ff9900; }
+}
+@keyframes screenShake {
+  0%,100% { transform: translate(0,0) rotate(0deg); }
+  15% { transform: translate(-8px, 2px) rotate(-0.5deg); }
+  35% { transform: translate(8px, -3px) rotate(0.5deg); }
+  55% { transform: translate(-5px, 4px) rotate(-0.3deg); }
+  75% { transform: translate(5px, -2px) rotate(0.3deg); }
+}
+@keyframes heartBreak {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.3); }
+  60% { transform: scale(0.8) rotate(-10deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+@keyframes scoreCount {
+  from { transform: scale(1.4); color: var(--gold); }
+  to { transform: scale(1); }
+}
+@keyframes confettiFall {
+  0% { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+}
+@keyframes letterReveal {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes xpFill {
+  from { width: var(--xp-start); }
+  to { width: var(--xp-end); }
+}
+@keyframes bossWarning {
+  0%, 100% { border-color: var(--red); box-shadow: 0 0 20px var(--red); }
+  50% { border-color: #ff6600; box-shadow: 0 0 60px #ff6600; }
+}
+@keyframes particleFly {
+  0% { opacity: 1; transform: translate(0,0); }
+  100% { opacity: 0; }
+}
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-6px); }
+  75% { transform: translateX(6px); }
+}
+@keyframes slideInRight {
+  from { right: -320px; }
+  to { right: 1rem; }
+}
+@keyframes slideOutRight {
+  from { right: 1rem; }
+  to { right: -320px; }
+}
+@keyframes timerWarning {
+  0%, 100% { background: var(--red); }
+  50% { background: #ff6600; }
+}
+@keyframes strobeRed {
+  0%, 100% { background: rgba(229,50,50,0.1); }
+  50% { background: rgba(229,50,50,0.25); }
+}
+
+/* ── Screens ── */
+.screen {
+  display: none;
+  min-height: 100vh;
+  padding: 1rem;
+}
+.screen.active { display: flex; flex-direction: column; align-items: center; }
+
+/* ═══════════════════════════════════════════
+   INTRO SCREEN
+════════════════════════════════════════════ */
+#intro-screen {
+  position: relative;
+  justify-content: center;
+  gap: 1.5rem;
+  overflow: hidden;
+}
+
+#pixel-rain-canvas {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.intro-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  max-width: 700px;
+  width: 100%;
+}
+
+.game-title {
+  font-size: clamp(1.4rem, 4vw, 2.4rem);
+  color: var(--gold);
+  animation: goldGlow 2s ease-in-out infinite;
+  text-align: center;
+  line-height: 1.6;
+  letter-spacing: 2px;
+}
+
+.game-subtitle {
+  font-size: clamp(0.4rem, 1.5vw, 0.65rem);
+  color: var(--blue);
+  text-align: center;
+  line-height: 2;
+}
+
+.coin-row {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+}
+
+.pixel-coin {
+  width: 24px; height: 24px;
+  background: var(--gold);
+  border: 3px solid #000;
+  border-radius: 50%;
+  box-shadow: inset -3px -3px 0 rgba(0,0,0,0.5), inset 3px 3px 0 rgba(255,255,255,0.3);
+  animation: floatCoin 1.5s ease-in-out infinite;
+}
+.pixel-coin:nth-child(2) { animation-delay: 0.3s; }
+.pixel-coin:nth-child(3) { animation-delay: 0.6s; }
+.pixel-coin:nth-child(4) { animation-delay: 0.9s; }
+.pixel-coin:nth-child(5) { animation-delay: 1.2s; }
+
+.world-map-canvas {
+  border: 4px solid var(--gold);
+  box-shadow: 0 0 20px rgba(247,213,29,0.4), 0 6px 0 #000;
+  image-rendering: pixelated;
+}
+
+.press-start-btn {
+  font-family: 'Press Start 2P', monospace;
+  font-size: clamp(0.6rem, 2vw, 0.9rem);
+  color: var(--dark);
+  background: var(--gold);
+  padding: 1rem 2rem;
+  cursor: pointer;
+  border: 4px solid #000;
+  box-shadow: inset -4px -4px 0 rgba(0,0,0,0.5), inset 4px 4px 0 rgba(255,255,255,0.3), 0 6px 0 #000;
+  animation: blink 1.2s step-end infinite;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  transition: none;
+}
+.press-start-btn:active {
+  box-shadow: inset -4px -4px 0 rgba(0,0,0,0.5), inset 4px 4px 0 rgba(255,255,255,0.3);
+  transform: translateY(6px);
+}
+
+.how-to-play {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--stone);
+  text-align: center;
+  line-height: 2;
+  max-width: 500px;
+}
+
+/* ═══════════════════════════════════════════
+   BOSS INTERSTITIAL
+════════════════════════════════════════════ */
+#boss-screen {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: rgba(13,0,23,0.95);
+  z-index: 1000;
+  justify-content: center;
+  gap: 2rem;
+  border: 8px solid var(--red);
+  animation: bossWarning 0.8s ease-in-out infinite;
+}
+
+.boss-title {
+  font-size: clamp(1rem, 4vw, 2rem);
+  color: var(--red);
+  text-align: center;
+  text-shadow: 0 0 20px var(--red);
+  animation: goldGlow 0.5s ease-in-out infinite;
+}
+
+.boss-subtitle {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--white);
+  text-align: center;
+}
+
+/* ═══════════════════════════════════════════
+   GAME SCREEN
+════════════════════════════════════════════ */
+#game-screen {
+  max-width: 820px;
+  margin: 0 auto;
+  width: 100%;
+  gap: 1rem;
+  padding-bottom: 2rem;
+}
+
+/* HUD */
+.hud {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--surface);
+  border: 4px solid #000;
+  box-shadow: inset -4px -4px 0 rgba(0,0,0,0.7), inset 4px 4px 0 rgba(255,255,255,0.1), 0 6px 0 #000;
+  padding: 0.75rem 1rem;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.hud-lives {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.heart {
+  font-size: 1.2rem;
+  transition: all 0.3s;
+}
+.heart.full::before { content: '❤️'; }
+.heart.broken::before { content: '🩶'; }
+.heart.empty::before { content: '🖤'; }
+.heart.breaking {
+  animation: heartBreak 0.4s ease-out forwards;
+}
+
+.hud-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  flex: 1;
+}
+
+.score-display {
+  font-size: clamp(0.5rem, 2vw, 0.8rem);
+  color: var(--gold);
+  text-shadow: 0 0 10px rgba(247,213,29,0.5);
+}
+
+.xp-bar-container {
+  width: 100%;
+  max-width: 200px;
+  height: 10px;
+  background: #000;
+  border: 2px solid var(--stone);
+}
+
+.xp-bar-fill {
+  height: 100%;
+  background: var(--green);
+  width: 0%;
+  transition: width 0.8s ease;
+}
+
+.xp-label {
+  font-size: 0.35rem;
+  color: var(--stone);
+}
+
+.hud-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.3rem;
+}
+
+.world-label {
+  font-size: clamp(0.4rem, 1.5vw, 0.6rem);
+  color: var(--blue);
+}
+
+.streak-badge {
+  font-size: clamp(0.35rem, 1.3vw, 0.55rem);
+  color: var(--purple);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.streak-badge.visible { opacity: 1; }
+
+.audio-btn {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.5rem;
+  background: var(--surface);
+  color: var(--stone);
+  border: 2px solid var(--stone);
+  padding: 0.3rem 0.5rem;
+  cursor: pointer;
+  box-shadow: 0 3px 0 #000;
+}
+.audio-btn:active { transform: translateY(3px); box-shadow: none; }
+
+/* Game Card */
+#game-card {
+  width: 100%;
+  background: var(--surface);
+  border: 4px solid #000;
+  box-shadow: inset -4px -4px 0 rgba(0,0,0,0.7), inset 4px 4px 0 rgba(255,255,255,0.15), 0 8px 0 #000;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+}
+
+#game-card.shake {
+  animation: screenShake 0.5s ease-out;
+}
+
+/* Round header */
+.round-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid var(--stone);
+  padding-bottom: 0.75rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.round-label {
+  font-size: clamp(0.4rem, 1.5vw, 0.6rem);
+  color: var(--green);
+}
+
+.topic-label {
+  font-size: clamp(0.35rem, 1.2vw, 0.5rem);
+  color: var(--stone);
+}
+
+/* Timer bar */
+.timer-container {
+  width: 100%;
+  height: 12px;
+  background: #000;
+  border: 2px solid var(--stone);
+  position: relative;
+}
+
+.timer-bar {
+  height: 100%;
+  background: var(--green);
+  width: 100%;
+  transition: width linear, background 0.3s;
+}
+.timer-bar.warning { animation: timerWarning 0.5s ease-in-out infinite; }
+
+.timer-text {
+  position: absolute;
+  right: 4px; top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.4rem;
+  color: var(--white);
+}
+
+/* Question text */
+.question-area {
+  background: #000;
+  border: 3px solid var(--stone);
+  padding: 1rem;
+  position: relative;
+}
+
+.question-cursor {
+  position: absolute;
+  bottom: 8px; right: 8px;
+  width: 0; height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 10px solid var(--gold);
+  animation: blink 0.8s step-end infinite;
+}
+
+#question-text {
+  font-family: 'Space Mono', monospace;
+  font-size: clamp(0.65rem, 2vw, 0.85rem);
+  line-height: 1.8;
+  color: var(--white);
+  cursor: pointer;
+  min-height: 3em;
+}
+
+/* Chart area */
+#chart-container {
+  display: none;
+  width: 100%;
+  background: #000;
+  border: 3px solid var(--stone);
+  padding: 0.75rem;
+}
+
+#chart-container canvas {
+  max-height: 200px;
+}
+
+/* MCQ Answers */
+#answers-area {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.mcq-btn {
+  font-family: 'Press Start 2P', monospace;
+  font-size: clamp(0.4rem, 1.5vw, 0.6rem);
+  text-align: left;
+  background: var(--stone);
+  color: var(--dark);
+  padding: 0.85rem 1rem;
+  cursor: pointer;
+  border: 4px solid #000;
+  box-shadow: inset -4px -4px 0 rgba(0,0,0,0.7), inset 4px 4px 0 rgba(255,255,255,0.3), 0 6px 0 #000;
+  transition: background 0.1s;
+  width: 100%;
+  line-height: 1.6;
+}
+.mcq-btn:hover:not(:disabled) { background: #9e9e9e; }
+.mcq-btn:active:not(:disabled) {
+  box-shadow: inset -4px -4px 0 rgba(0,0,0,0.7), inset 4px 4px 0 rgba(255,255,255,0.3);
+  transform: translateY(6px);
+}
+.mcq-btn:disabled { cursor: default; }
+.mcq-btn.correct { background: var(--green) !important; color: #000; }
+.mcq-btn.wrong { background: var(--red) !important; color: #fff; }
+
+/* ── SEQUENCE Interaction ── */
+.sequence-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.sequence-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+.seq-chip {
+  font-family: 'Press Start 2P', monospace;
+  font-size: clamp(0.45rem, 1.5vw, 0.7rem);
+  background: var(--gold);
+  color: var(--dark);
+  padding: 0.6rem 1rem;
+  cursor: pointer;
+  border: 4px solid #000;
+  box-shadow: inset -4px -4px 0 rgba(0,0,0,0.5), inset 4px 4px 0 rgba(255,255,255,0.3), 0 6px 0 #000;
+  transition: all 0.1s;
+}
+.seq-chip:active:not(:disabled) {
+  box-shadow: inset -4px -4px 0 rgba(0,0,0,0.5), inset 4px 4px 0 rgba(255,255,255,0.3);
+  transform: translateY(6px);
+}
+.seq-chip.used { opacity: 0.3; cursor: default; background: var(--stone); }
+.seq-chip.shake-wrong { animation: shake 0.3s ease-out; }
+
+.sequence-slots {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.seq-slot {
+  font-family: 'Space Mono', monospace;
+  font-size: clamp(0.45rem, 1.5vw, 0.65rem);
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.slot-number {
+  color: var(--blue);
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.5rem;
+}
+
+.slot-value {
+  background: #000;
+  border: 2px solid var(--stone);
+  padding: 0.4rem 0.6rem;
+  min-width: 70px;
+  text-align: center;
+  color: var(--gold);
+  font-size: 0.6rem;
+}
+.slot-value.filled { border-color: var(--gold); }
+.slot-value.correct { border-color: var(--green); background: rgba(93,222,36,0.2); }
+.slot-value.wrong { border-color: var(--red); background: rgba(229,50,50,0.2); }
+
+/* ── SLIDER Interaction ── */
+.slider-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.slider-readout {
+  font-size: clamp(0.6rem, 2vw, 0.9rem);
+  color: var(--gold);
+  text-align: center;
+}
+
+.pixel-slider-wrap {
+  width: 100%;
+  max-width: 500px;
+  position: relative;
+}
+
+.pixel-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 20px;
+  background: #000;
+  border: 4px solid var(--stone);
+  outline: none;
+  cursor: pointer;
+}
+.pixel-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 28px; height: 28px;
+  background: var(--gold);
+  border: 4px solid #000;
+  box-shadow: 0 4px 0 #000;
+  cursor: pointer;
+  image-rendering: pixelated;
+}
+.pixel-slider::-moz-range-thumb {
+  width: 28px; height: 28px;
+  background: var(--gold);
+  border: 4px solid #000;
+  cursor: pointer;
+}
+
+.slider-track-fill {
+  position: absolute;
+  top: 4px; left: 4px;
+  height: 12px;
+  background: var(--blue);
+  pointer-events: none;
+  transition: width 0.05s;
+}
+
+.slider-labels {
+  display: flex;
+  justify-content: space-between;
+  font-family: 'Space Mono', monospace;
+  font-size: 0.55rem;
+  color: var(--stone);
+  padding: 0 2px;
+}
+
+.slider-submit-btn {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.6rem;
+  background: var(--green);
+  color: var(--dark);
+  padding: 0.8rem 2rem;
+  cursor: pointer;
+  border: 4px solid #000;
+  box-shadow: inset -4px -4px 0 rgba(0,0,0,0.5), inset 4px 4px 0 rgba(255,255,255,0.3), 0 6px 0 #000;
+  display: none;
+}
+.slider-submit-btn.visible { display: block; }
+.slider-submit-btn:active {
+  box-shadow: inset -4px -4px 0 rgba(0,0,0,0.5), inset 4px 4px 0 rgba(255,255,255,0.3);
+  transform: translateY(6px);
+}
+
+.slider-feedback {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.65rem;
+  text-align: center;
+  display: none;
+  padding: 0.5rem;
+  border: 2px solid var(--stone);
+}
+
+/* ── RAPIDFIRE Interaction ── */
+.rapidfire-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.rf-header {
+  font-size: clamp(0.5rem, 1.8vw, 0.75rem);
+  color: var(--purple);
+  text-align: center;
+}
+
+.rf-statement {
+  font-family: 'Space Mono', monospace;
+  font-size: clamp(0.65rem, 2vw, 0.85rem);
+  line-height: 1.8;
+  background: #000;
+  border: 3px solid var(--purple);
+  padding: 1rem;
+  color: var(--white);
+  min-height: 4em;
+}
+
+.rf-statement-count {
+  font-size: 0.5rem;
+  color: var(--stone);
+  text-align: center;
+}
+
+.rf-timer-container {
+  width: 100%;
+  height: 10px;
+  background: #000;
+  border: 2px solid var(--stone);
+}
+
+.rf-timer-bar {
+  height: 100%;
+  background: var(--red);
+  width: 100%;
+  transition: width linear;
+}
+
+.rf-buttons {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+}
+
+.rf-btn {
+  font-family: 'Press Start 2P', monospace;
+  font-size: clamp(0.55rem, 2vw, 0.8rem);
+  padding: 1rem 2.5rem;
+  cursor: pointer;
+  border: 4px solid #000;
+  box-shadow: inset -4px -4px 0 rgba(0,0,0,0.5), inset 4px 4px 0 rgba(255,255,255,0.3), 0 6px 0 #000;
+}
+.rf-btn:active {
+  box-shadow: inset -4px -4px 0 rgba(0,0,0,0.5), inset 4px 4px 0 rgba(255,255,255,0.3);
+  transform: translateY(6px);
+}
+.rf-btn.yes-btn { background: var(--green); color: var(--dark); }
+.rf-btn.no-btn { background: var(--red); color: var(--white); }
+.rf-btn:disabled { opacity: 0.5; cursor: default; }
+
+.rf-mini-score {
+  position: fixed;
+  font-size: 1rem;
+  color: var(--gold);
+  pointer-events: none;
+  z-index: 500;
+  animation: particleFly 0.9s ease-out forwards;
+}
+
+/* Feedback overlay */
+.answer-feedback {
+  text-align: center;
+  padding: 0.75rem;
+  border: 3px solid;
+  font-size: clamp(0.45rem, 1.5vw, 0.65rem);
+  display: none;
+}
+.answer-feedback.correct { border-color: var(--green); background: rgba(93,222,36,0.15); color: var(--green); }
+.answer-feedback.wrong { border-color: var(--red); background: rgba(229,50,50,0.15); color: var(--red); }
+
+.explanation-text {
+  font-family: 'Space Mono', monospace;
+  font-size: clamp(0.55rem, 1.5vw, 0.7rem);
+  line-height: 1.8;
+  color: #ccc;
+  margin-top: 0.5rem;
+}
+
+/* Next button */
+#next-btn {
+  font-family: 'Press Start 2P', monospace;
+  font-size: clamp(0.5rem, 1.5vw, 0.7rem);
+  background: var(--gold);
+  color: var(--dark);
+  padding: 0.9rem 2rem;
+  cursor: pointer;
+  border: 4px solid #000;
+  box-shadow: inset -4px -4px 0 rgba(0,0,0,0.5), inset 4px 4px 0 rgba(255,255,255,0.3), 0 6px 0 #000;
+  display: none;
+  align-self: center;
+}
+#next-btn.visible { display: block; }
+#next-btn:active {
+  box-shadow: inset -4px -4px 0 rgba(0,0,0,0.5), inset 4px 4px 0 rgba(255,255,255,0.3);
+  transform: translateY(6px);
+}
+
+/* ═══════════════════════════════════════════
+   LIGHTNING ROUND INTERSTITIAL
+════════════════════════════════════════════ */
+#lightning-screen {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: rgba(13,0,23,0.97);
+  z-index: 1000;
+  justify-content: center;
+  gap: 1.5rem;
+  border: 6px solid var(--purple);
+}
+
+.lightning-title {
+  font-size: clamp(1rem, 4vw, 1.8rem);
+  color: var(--purple);
+  text-shadow: 0 0 20px var(--purple);
+  animation: goldGlow 0.6s ease-in-out infinite;
+}
+
+.lightning-subtitle {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--white);
+  text-align: center;
+}
+
+/* ═══════════════════════════════════════════
+   RESULTS SCREEN
+════════════════════════════════════════════ */
+#results-screen {
+  justify-content: center;
+  gap: 1.5rem;
+  max-width: 700px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.results-card {
+  width: 100%;
+  background: var(--surface);
+  border: 4px solid var(--gold);
+  box-shadow: inset -4px -4px 0 rgba(0,0,0,0.7), inset 4px 4px 0 rgba(255,255,255,0.15), 0 8px 0 #000, 0 0 30px rgba(247,213,29,0.3);
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.high-score-header {
+  font-size: clamp(0.5rem, 2vw, 0.8rem);
+  color: var(--stone);
+  letter-spacing: 4px;
+}
+
+.flawless-banner {
+  font-size: clamp(0.6rem, 2vw, 1rem);
+  color: var(--gold);
+  text-shadow: 0 0 20px var(--gold);
+  display: none;
+  animation: goldGlow 1s ease-in-out infinite;
+}
+.flawless-banner.visible { display: block; }
+
+.final-score-display {
+  font-size: clamp(1.2rem, 5vw, 2.5rem);
+  color: var(--gold);
+  text-shadow: 0 0 30px rgba(247,213,29,0.6);
+}
+
+.rank-display {
+  font-size: clamp(0.5rem, 2vw, 0.85rem);
+  color: var(--purple);
+  text-align: center;
+  min-height: 2em;
+}
+
+.result-badge {
+  font-size: clamp(0.4rem, 1.5vw, 0.65rem);
+  color: var(--blue);
+  text-align: center;
+  padding: 0.5rem 1rem;
+  border: 2px solid var(--blue);
+}
+
+.results-breakdown {
+  font-family: 'Space Mono', monospace;
+  font-size: clamp(0.5rem, 1.5vw, 0.65rem);
+  color: #ccc;
+  line-height: 2.2;
+  text-align: center;
+  width: 100%;
+}
+
+.play-again-btn {
+  font-family: 'Press Start 2P', monospace;
+  font-size: clamp(0.5rem, 1.5vw, 0.7rem);
+  background: var(--green);
+  color: var(--dark);
+  padding: 1rem 2.5rem;
+  cursor: pointer;
+  border: 4px solid #000;
+  box-shadow: inset -4px -4px 0 rgba(0,0,0,0.5), inset 4px 4px 0 rgba(255,255,255,0.3), 0 6px 0 #000;
+}
+.play-again-btn:active {
+  box-shadow: inset -4px -4px 0 rgba(0,0,0,0.5), inset 4px 4px 0 rgba(255,255,255,0.3);
+  transform: translateY(6px);
+}
+
+/* ═══════════════════════════════════════════
+   ACHIEVEMENT TOASTS
+════════════════════════════════════════════ */
+#toast-container {
+  position: fixed;
+  top: 1rem;
+  right: -320px;
+  width: 280px;
+  z-index: 5000;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.achievement-toast {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.5rem;
+  background: var(--surface);
+  color: var(--gold);
+  padding: 0.75rem 1rem;
+  border: 3px solid var(--gold);
+  box-shadow: 0 4px 0 #000, 0 0 20px rgba(247,213,29,0.4);
+  line-height: 1.8;
+  position: relative;
+  right: -320px;
+  transition: right 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.achievement-toast.show { right: 0; }
+
+/* ═══════════════════════════════════════════
+   PIXEL CONFETTI
+════════════════════════════════════════════ */
+.confetti-piece {
+  position: fixed;
+  width: 10px; height: 10px;
+  pointer-events: none;
+  z-index: 4000;
+  border-radius: 2px;
+  animation: confettiFall linear forwards;
+}
+
+/* ═══════════════════════════════════════════
+   PARTICLE BURST
+════════════════════════════════════════════ */
+.particle {
+  position: fixed;
+  width: 8px; height: 8px;
+  background: var(--gold);
+  pointer-events: none;
+  z-index: 4500;
+  border: 2px solid #000;
+}
+
+/* ── Utility ── */
+.hidden { display: none !important; }
+
+/* ── Tech Stack Pills ── */
+.tech-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+}
+.tech-pill {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.5rem;
+  color: var(--blue);
+  border: 2px solid var(--blue);
+  padding: 0.25rem 0.6rem;
+  letter-spacing: 1px;
+  background: rgba(94,231,255,0.05);
+}
+.intro-footer {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.4rem;
+  color: var(--stone);
+  text-align: center;
+  letter-spacing: 2px;
+}
+
+/* ── Difficulty Stars ── */
+.difficulty-stars {
+  font-size: 0.6rem;
+  color: var(--gold);
+  letter-spacing: 1px;
+}
+
+/* ── Wild Callout ── */
+.wild-callout {
+  background: rgba(247,213,29,0.05);
+  border: 2px solid var(--gold);
+  padding: 0.75rem 1rem;
+  margin-top: 0.75rem;
+}
+.wild-callout-header {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.45rem;
+  color: var(--gold);
+  margin-bottom: 0.5rem;
+}
+.wild-callout-body {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.6rem;
+  line-height: 1.8;
+  color: var(--gold);
+}
+
+/* ── Percentile Badge ── */
+.percentile-badge {
+  font-family: 'Press Start 2P', monospace;
+  font-size: clamp(0.45rem, 1.5vw, 0.65rem);
+  padding: 0.5rem 1.2rem;
+  border: 3px solid var(--gold);
+  background: rgba(247,213,29,0.1);
+  color: var(--gold);
+  text-align: center;
+  box-shadow: 0 0 15px rgba(247,213,29,0.3);
+}
+.global-stats {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.5rem;
+  color: var(--stone);
+  text-align: center;
+  line-height: 2;
+  border-top: 1px solid #333;
+  padding-top: 0.75rem;
+  width: 100%;
+}
+.performance-insights {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.6rem;
+  color: var(--blue);
+  text-align: center;
+  line-height: 2;
+}
+
+/* ── Share Buttons ── */
+.share-row {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.share-btn {
+  font-family: 'Press Start 2P', monospace;
+  font-size: clamp(0.35rem, 1.2vw, 0.5rem);
+  padding: 0.75rem 1.2rem;
+  cursor: pointer;
+  border: 4px solid #000;
+  box-shadow: inset -4px -4px 0 rgba(0,0,0,0.5), inset 4px 4px 0 rgba(255,255,255,0.3), 0 6px 0 #000;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.share-btn:active {
+  box-shadow: inset -4px -4px 0 rgba(0,0,0,0.5), inset 4px 4px 0 rgba(255,255,255,0.3);
+  transform: translateY(6px);
+}
+.share-btn.linkedin { background: var(--blue); color: var(--dark); }
+.share-btn.scorecard { background: var(--purple); color: var(--dark); }
+
+/* ── Radar Chart Container ── */
+#radar-container {
+  width: 100%;
+  max-width: 380px;
+  margin: 0 auto;
+}
+#radar-container canvas { max-height: 280px; }
+
+/* ── Simpson Toggle / Reveal Confound ── */
+.simpson-toggle, .reveal-confound-btn {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.45rem;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  border: 3px solid var(--gold);
+  background: var(--surface);
+  color: var(--gold);
+  display: block;
+  margin: 0.5rem auto 0;
+}
+.simpson-toggle:disabled, .reveal-confound-btn:disabled { opacity: 0.4; cursor: default; }
+.reveal-confound-btn { border-color: var(--green); color: var(--green); display: none; }
+.reveal-confound-btn.visible { display: block; }
+
+/* ── Fraud Grid ── */
+.fraud-grid-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem;
+}
+.fraud-grid {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 3px;
+  max-width: 260px;
+}
+.fraud-cell {
+  width: 22px;
+  height: 22px;
+  border: 1px solid #000;
+}
+.fraud-cell.not-fraud { background: var(--blue); }
+.fraud-cell.fraud { background: var(--red); }
+.cm-table {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.5rem;
+  border-collapse: collapse;
+  color: #ccc;
+}
+.cm-table th, .cm-table td {
+  border: 1px solid #444;
+  padding: 0.3rem 0.5rem;
+  text-align: center;
+}
+.cm-table th { color: var(--gold); background: #111; }
+.cm-tp { color: var(--green); font-weight: bold; }
+.cm-fn { color: var(--red); font-weight: bold; }
+.cm-stats {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.55rem;
+  color: var(--purple);
+  text-align: center;
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ INTRO SCREEN ═══════════════ -->
+<canvas id="pixel-rain-canvas"></canvas>
+
+<section id="intro-screen" class="screen active">
+  <div class="intro-content">
+    <div class="coin-row">
+      <div class="pixel-coin"></div>
+      <div class="pixel-coin"></div>
+      <div class="pixel-coin"></div>
+      <div class="pixel-coin"></div>
+      <div class="pixel-coin"></div>
+    </div>
+
+    <h1 class="game-title">DATA<br>ODYSSEY</h1>
+    <p class="game-subtitle">THE ML CONCEPTS EVERY DATA SCIENTIST SHOULD KNOW</p>
+
+    <canvas id="world-map-canvas" class="world-map-canvas" width="480" height="80"></canvas>
+
+    <button id="start-btn" class="press-start-btn">► PRESS START ◄</button>
+
+    <div class="tech-pills">
+      <span class="tech-pill">Vanilla JS</span>
+      <span class="tech-pill">Canvas 2D</span>
+      <span class="tech-pill">Web Audio API</span>
+      <span class="tech-pill">Chart.js</span>
+    </div>
+
+    <p class="how-to-play">
+      Answer data science questions correctly.<br>
+      WRONG answers cost a ❤️ LIFE.<br>
+      Build STREAKS for bonus XP.<br>
+      Beat the BOSS on Round 10!
+    </p>
+
+    <p class="intro-footer">ZERO FRAMEWORKS &nbsp;·&nbsp; ONE FILE &nbsp;·&nbsp; PURE JAVASCRIPT</p>
+  </div>
+</section>
+
+<!-- ═══════════════ BOSS INTERSTITIAL ═══════════════ -->
+<section id="boss-screen" class="screen">
+  <div class="boss-title">⚠ BOSS LEVEL ⚠</div>
+  <div class="boss-subtitle">REGRESSION TO THE MEAN<br><br>THE FINAL ROUND BEGINS...</div>
+</section>
+
+<!-- ═══════════════ LIGHTNING ROUND INTERSTITIAL ═══════════════ -->
+<section id="lightning-screen" class="screen">
+  <div class="lightning-title">⚡ LIGHTNING ROUND ⚡</div>
+  <div class="lightning-subtitle">3 TRUE/FALSE STATEMENTS<br>5 SECONDS EACH<br><br>ANSWER FAST!</div>
+</section>
+
+<!-- ═══════════════ GAME SCREEN ═══════════════ -->
+<section id="game-screen" class="screen">
+
+  <!-- HUD -->
+  <div class="hud">
+    <div class="hud-lives">
+      <div class="heart full" id="heart-1"></div>
+      <div class="heart full" id="heart-2"></div>
+      <div class="heart full" id="heart-3"></div>
+    </div>
+
+    <div class="hud-center">
+      <div class="score-display" id="score-display">SCORE: 000000</div>
+      <div class="xp-bar-container">
+        <div class="xp-bar-fill" id="xp-bar"></div>
+      </div>
+      <div class="xp-label" id="xp-label">XP 0/10</div>
+    </div>
+
+    <div class="hud-right">
+      <div class="world-label" id="world-label">WORLD 1-1</div>
+      <div class="streak-badge" id="streak-badge">⚡ ×1</div>
+      <button class="audio-btn" id="audio-btn">♪ ON</button>
+    </div>
+  </div>
+
+  <!-- Game Card -->
+  <div id="game-card" class="pixel-box" style="box-shadow: inset -4px -4px 0 rgba(0,0,0,0.7), inset 4px 4px 0 rgba(255,255,255,0.15), 0 8px 0 #000;">
+
+    <!-- Round header -->
+    <div class="round-header">
+      <div class="round-label" id="round-label">ROUND 1/10</div>
+      <div class="topic-label" id="topic-label">CORRELATION VS CAUSATION</div>
+    </div>
+
+    <!-- Timer -->
+    <div class="timer-container">
+      <div class="timer-bar" id="timer-bar"></div>
+      <div class="timer-text" id="timer-text">30</div>
+    </div>
+
+    <!-- Question -->
+    <div class="question-area">
+      <div id="question-text"></div>
+      <div class="question-cursor"></div>
+    </div>
+
+    <!-- Chart (optional) -->
+    <div id="chart-container">
+      <canvas id="chart-canvas"></canvas>
+      <div id="custom-viz-container"></div>
+    </div>
+
+    <!-- Answers (dynamic) -->
+    <div id="answers-area"></div>
+
+    <!-- Feedback -->
+    <div class="answer-feedback" id="answer-feedback">
+      <div id="feedback-header"></div>
+      <div class="explanation-text" id="explanation-text"></div>
+    </div>
+
+    <!-- Next button -->
+    <button id="next-btn">NEXT ►</button>
+
+  </div>
+</section>
+
+<!-- ═══════════════ RESULTS SCREEN ═══════════════ -->
+<section id="results-screen" class="screen">
+  <div class="results-card">
+    <div class="high-score-header">- ML APTITUDE REPORT -</div>
+    <div class="flawless-banner" id="flawless-banner">★ FLAWLESS VICTORY ★</div>
+    <div id="radar-container"><canvas id="radar-canvas"></canvas></div>
+    <div class="percentile-badge" id="percentile-badge"></div>
+    <div class="final-score-display" id="final-score-display">000000</div>
+    <div class="rank-display" id="rank-display"></div>
+    <div class="result-badge" id="result-badge"></div>
+    <div class="results-breakdown" id="results-breakdown"></div>
+    <div class="performance-insights" id="performance-insights"></div>
+    <div class="global-stats">AVG SCORE: 647 &nbsp;·&nbsp; MEDIAN CORRECT: 6/10 &nbsp;·&nbsp; HARDEST Q: #5 (38% CORRECT)</div>
+    <div class="share-row">
+      <button class="share-btn linkedin" id="share-linkedin-btn">SHARE ON LINKEDIN</button>
+      <button class="share-btn scorecard" id="download-scorecard-btn">DOWNLOAD SCORE CARD</button>
+    </div>
+    <button class="play-again-btn" id="play-again-btn">► PLAY AGAIN ◄</button>
+  </div>
+</section>
+
+<!-- Toast container -->
+<div id="toast-container"></div>
+
+<script>
+'use strict';
+
+/* ══════════════════════════════════════════════════════════
+   QUESTION DATA
+══════════════════════════════════════════════════════════ */
+const QUESTIONS_RAW = [
+  {
+    round: 1,
+    type: 'mcq',
+    world: '1-1',
+    topic: 'CORRELATION VS CAUSATION',
+    question: 'Ice cream sales and drowning deaths both peak in summer. A city council member concludes that ice cream causes drowning. What is the fundamental flaw in this reasoning?',
+    answers: [
+      'Ice cream sales data is unreliable',
+      'Both variables are driven by a third factor: hot weather (confounding variable)',
+      'Drowning statistics are not measured correctly',
+      'The correlation coefficient is too low to be meaningful'
+    ],
+    correctText: 'Both variables are driven by a third factor: hot weather (confounding variable)',
+    explanation: 'Correlation ≠ Causation. Hot weather independently increases both ice cream sales AND swimming activity. This hidden driver is called a CONFOUNDING VARIABLE. Without a controlled experiment, you cannot establish causation from correlation alone.',
+    wildCallout: 'TikTok found video-length correlated with shares — confounded by genre; long videos trended in specific niches.',
+    difficulty: '★☆☆',
+    hasChart: true,
+    timerSeconds: 30
+  },
+  {
+    round: 2,
+    type: 'mcq',
+    world: '1-2',
+    topic: "SIMPSON'S PARADOX",
+    question: "Hospital A has a higher overall survival rate than Hospital B. But when you split patients into 'mild cases' and 'severe cases', Hospital B beats Hospital A in BOTH categories. How is this possible?",
+    answers: [
+      'The data was collected incorrectly at one hospital',
+      'Hospital A has newer equipment',
+      "Hospital A treats mostly mild cases; Hospital B handles more severe cases, so mixing distorts the overall rate",
+      'Survival rate is not a valid metric for hospital comparison'
+    ],
+    correctText: "Hospital A treats mostly mild cases; Hospital B handles more severe cases, so mixing distorts the overall rate",
+    explanation: "This is Simpson's Paradox — when a lurking variable (case severity mix) reverses a trend seen in aggregated data. Always disaggregate data before drawing conclusions. The paradox vanishes once you control for case mix.",
+    wildCallout: "UC Berkeley's graduate admissions showed gender bias overall — reversed when departments were analyzed individually.",
+    difficulty: '★★★',
+    hasChart: true,
+    timerSeconds: 30
+  },
+  {
+    round: 3,
+    type: 'sequence',
+    world: '1-3',
+    topic: 'P-VALUE ORDERING',
+    question: 'Click these p-values in order from MOST to LEAST statistically significant (most significant first):',
+    chips: ['0.003', '0.047', '0.12', '0.31'],
+    correctOrder: ['0.003', '0.047', '0.12', '0.31'],
+    explanation: 'Statistical significance increases as p-value DECREASES. p=0.003 is extremely significant (0.3% chance of getting this result by chance). p=0.047 barely passes the α=0.05 threshold. p=0.12 and p=0.31 are not statistically significant.',
+    wildCallout: 'FDA drug approvals require p<0.05, but 5% of all published drug trials are false positives by chance alone.',
+    difficulty: '★★☆',
+    hasChart: false,
+    timerSeconds: 45
+  },
+  {
+    round: 4,
+    type: 'mcq',
+    world: '2-1',
+    topic: 'OVERFITTING',
+    question: 'Your ML model scores 99.8% accuracy on training data but only 62% on test data. Which scenario BEST explains this result?',
+    answers: [
+      'The test dataset is corrupted',
+      'The model has memorized training data noise instead of learning generalizable patterns',
+      'You need a larger training dataset before any conclusions can be drawn',
+      'The model architecture is too simple for the problem'
+    ],
+    correctText: 'The model has memorized training data noise instead of learning generalizable patterns',
+    explanation: 'This is textbook OVERFITTING. The massive gap between train and test accuracy (99.8% vs 62%) means the model learned noise specific to training examples rather than true patterns. Solutions: regularization, dropout, cross-validation, simpler model, more diverse training data.',
+    wildCallout: "Google's first display ad CTR model achieved 99.8% train accuracy but was outperformed by logistic regression in production.",
+    difficulty: '★☆☆',
+    hasChart: true,
+    timerSeconds: 30
+  },
+  {
+    round: 5,
+    type: 'mcq',
+    world: '2-2',
+    topic: 'SURVIVORSHIP BIAS',
+    question: "WWII engineers studied bullet holes on returning bombers to decide where to add armor. Most holes were on wings and fuselage — very few on engines. Where should they ADD armor?",
+    answers: [
+      'Wings and fuselage — that is where the damage is concentrated',
+      'Engines — planes hit there did not return, so that damage is invisible in the data',
+      'Cockpit — pilots are the most valuable asset',
+      'Everywhere equally — all surfaces are equally vulnerable'
+    ],
+    correctText: 'Engines — planes hit there did not return, so that damage is invisible in the data',
+    explanation: "Classic Survivorship Bias (Abraham Wald's insight). We only see planes that SURVIVED. Engine hits caused planes to crash — those planes never returned. The wing/fuselage hits must be survivable. Armor the engines. Always ask: what data is MISSING from your sample?",
+    wildCallout: "Yelp's early review filter removed legitimate new restaurants from rankings — their data only showed the survivors.",
+    difficulty: '★★☆',
+    hasChart: true,
+    timerSeconds: 30
+  },
+  {
+    round: 6,
+    type: 'mcq',
+    world: '2-3',
+    topic: 'A/B TEST NOVELTY EFFECT',
+    question: 'Your A/B test shows the new UI increases engagement by 35% over 2 weeks. Your VP wants to ship immediately. What critical concern should you raise?',
+    answers: [
+      'The sample size may be too small',
+      'The 35% gain may be temporary novelty effect — users engaging because something is new, not better',
+      'A/B tests cannot measure engagement accurately',
+      'Two weeks is too long to run an A/B test'
+    ],
+    correctText: 'The 35% gain may be temporary novelty effect — users engaging because something is new, not better',
+    explanation: 'The Novelty Effect is when users temporarily increase engagement with ANY change simply because it is new. A true A/B test should run long enough for novelty to wear off (typically 4-8 weeks for major UI changes). Shipping based on novelty spike = false positive, leading to wrong product decisions.',
+    wildCallout: 'Snapchat Stories saw 40% DAU spike at launch — 60% of that gain evaporated within 90 days as novelty faded.',
+    difficulty: '★★☆',
+    hasChart: false,
+    timerSeconds: 30
+  },
+  {
+    round: 7,
+    type: 'slider',
+    world: '3-1',
+    topic: 'R² / VARIANCE EXPLAINED',
+    question: 'The correlation between study hours and exam score is r = 0.70. What PERCENTAGE of the variance in exam scores is explained by study hours? (Drag the slider to your answer)',
+    sliderMin: 0,
+    sliderMax: 100,
+    correctValue: 49,
+    tolerance: { full: 6, half: 16 },
+    explanation: 'R² = r² = (0.70)² = 0.49 = 49%. This is the COEFFICIENT OF DETERMINATION. It means study hours explain 49% of the variation in exam scores. The remaining 51% is explained by other factors (sleep, prior knowledge, test anxiety, etc.).',
+    wildCallout: 'In housing markets, r=0.70 between square footage and price means floor plan explains ~49% of price variation.',
+    difficulty: '★★★',
+    hasChart: true,
+    timerSeconds: 40
+  },
+  {
+    round: 8,
+    type: 'mcq',
+    world: '3-2',
+    topic: 'SKEWED DISTRIBUTIONS',
+    question: 'A company reports "average salary: $95,000" — but most employees earn $45,000-$60,000. Five C-suite executives earn $800,000+. Which measure would MORE ACCURATELY represent a typical employee\'s salary?',
+    answers: [
+      'The mean — it accounts for all salary values equally',
+      'The median — it is resistant to the extreme high salaries pulling the average up',
+      'The mode — the most common salary is always the best measure',
+      'Standard deviation — it captures the full spread of salaries'
+    ],
+    correctText: 'The median — it is resistant to the extreme high salaries pulling the average up',
+    explanation: 'In RIGHT-SKEWED distributions (a few very high outliers), the mean is pulled far above where most data sits. The MEDIAN (middle value) is resistant to outliers and better represents the "typical" experience. This is why housing prices, income data, and company valuations are usually reported as medians.',
+    wildCallout: 'The US Census reports median household income — not mean — because 400 billionaires would distort a national average.',
+    difficulty: '★☆☆',
+    hasChart: true,
+    timerSeconds: 30
+  },
+  {
+    round: 9,
+    type: 'rapidfire',
+    world: '3-3',
+    topic: 'ACCURACY PARADOX',
+    question: 'LIGHTNING ROUND: True or False?',
+    statements: [
+      {
+        text: 'A fraud detection model with 99% accuracy is always production-ready.',
+        answer: false,
+        explanation: 'FALSE — if only 1% of transactions are fraud, predicting "Not Fraud" every time gets 99% accuracy while catching zero frauds!'
+      },
+      {
+        text: 'Always predicting "Not Fraud" achieves 99% accuracy on a dataset where 1% of transactions are fraudulent.',
+        answer: true,
+        explanation: 'TRUE — this is the Accuracy Paradox. A trivial model beats 99% by exploiting class imbalance. Use F1, Precision/Recall, or AUC-ROC instead.'
+      },
+      {
+        text: 'F1 Score is the harmonic mean of Precision and Recall.',
+        answer: true,
+        explanation: 'TRUE — F1 = 2 × (Precision × Recall) / (Precision + Recall). It punishes extreme imbalances between precision and recall, giving a single metric for imbalanced classes.'
+      }
+    ],
+    wildCallout: "A major bank's fraud model had 99.4% accuracy but 0% recall on fraud — caught zero actual fraud cases at launch.",
+    difficulty: '★★☆',
+    hasChart: true,
+    timerSeconds: 15
+  },
+  {
+    round: 10,
+    type: 'mcq',
+    world: '4-1',
+    topic: 'REGRESSION TO THE MEAN',
+    question: '⚠ BOSS ⚠ — A student scores 98/100 on Monday\'s test (their personal best). On Tuesday they score 74/100. Their teacher says the high score "went to their head." What is the more likely statistical explanation?',
+    answers: [
+      'The Tuesday test was objectively harder',
+      'The student studied less after the high score',
+      'Extreme scores naturally drift toward the average on retesting — regression to the mean',
+      'Performance variation is always caused by psychological factors'
+    ],
+    correctText: 'Extreme scores naturally drift toward the average on retesting — regression to the mean',
+    explanation: 'REGRESSION TO THE MEAN: Extreme outcomes (very high or very low) are partly due to chance. On retesting, scores naturally drift toward the individual\'s true average. Francis Galton discovered this in 1886 studying heights. Coaches who punish bad performance and praise good performance will observe "improvement" and "decline" that are purely statistical — not causal.',
+    wildCallout: 'Sports coaches who praise exceptional performance see "decline" next game; those who criticize poor play see "improvement" — both are regression to mean.',
+    difficulty: '★★★',
+    hasChart: false,
+    timerSeconds: 25,
+    isBoss: true
+  }
+];
+
+/* ══════════════════════════════════════════════════════════
+   GAME STATE
+══════════════════════════════════════════════════════════ */
+let state = {
+  score: 0,
+  lives: 3,
+  streak: 0,
+  round: 0,
+  questions: [],
+  audioEnabled: true,
+  audioUnlocked: false,
+  firstAnswerGiven: false,
+  totalCorrect: 0,
+  answers: [],
+  rfScore: 0,
+  rfCorrect: 0,
+  maxStreak: 0,
+  correctAnswerTimes: [],
+  specialQCorrect: 0
+};
+
+let lastCorrectPositions = [];
+let currentChart = null;
+let currentQ = null;
+let timerInterval = null;
+let timerRemaining = 0;
+let typewriterInterval = null;
+let fullQuestionText = '';
+let rfTimerInterval = null;
+
+/* ══════════════════════════════════════════════════════════
+   AUDIO ENGINE (Web Audio API)
+══════════════════════════════════════════════════════════ */
+let audioCtx = null;
+
+function getAudioCtx() {
+  if (!audioCtx) {
+    try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) {}
+  }
+  return audioCtx;
+}
+
+function playTone(freq, dur, type='square', vol=0.12, delay=0) {
+  if (!state.audioEnabled || !state.audioUnlocked) return;
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.type = type;
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(0, ctx.currentTime + delay);
+  gain.gain.linearRampToValueAtTime(vol, ctx.currentTime + delay + 0.01);
+  gain.gain.linearRampToValueAtTime(0, ctx.currentTime + delay + dur);
+  osc.start(ctx.currentTime + delay);
+  osc.stop(ctx.currentTime + delay + dur + 0.05);
+}
+
+function playCorrect() {
+  // Ascending arpeggio C5→E5→G5→C6
+  const notes = [523.25, 659.25, 783.99, 1046.5];
+  notes.forEach((f, i) => playTone(f, 0.1, 'square', 0.12, i * 0.09));
+}
+
+function playWrong() {
+  playTone(587.33, 0.2, 'sawtooth', 0.15, 0);
+  playTone(415.30, 0.3, 'sawtooth', 0.12, 0.22);
+}
+
+function playStreak() {
+  // Mario coin jingle E5→E5→B5→E6→G5→B5→C6
+  const notes = [659.25, 659.25, 987.77, 1318.5, 783.99, 987.77, 1046.5];
+  const durs  = [0.08,   0.08,   0.08,   0.12,   0.08,   0.08,   0.16];
+  let t = 0;
+  notes.forEach((f, i) => { playTone(f, durs[i], 'square', 0.1, t); t += durs[i] + 0.02; });
+}
+
+function playLevelUp() {
+  const scale = [261.63, 293.66, 329.63, 349.23, 392, 440, 493.88, 523.25];
+  scale.forEach((f, i) => playTone(f, 0.12, 'triangle', 0.1, i * 0.1));
+}
+
+function playBoss() {
+  playTone(55, 0.4, 'sawtooth', 0.18, 0);
+  playTone(73.4, 0.3, 'sawtooth', 0.14, 0.1);
+  playTone(880, 0.15, 'square', 0.1, 0.5);
+  playTone(1174.66, 0.2, 'square', 0.1, 0.65);
+}
+
+function playGameOver() {
+  const notes = [392, 349.23, 329.63, 293.66, 261.63, 220];
+  notes.forEach((f, i) => playTone(f, 0.25, 'triangle', 0.1, i * 0.22));
+}
+
+function playTick() {
+  playTone(800, 0.05, 'square', 0.06, 0);
+}
+
+function unlockAudio() {
+  if (state.audioUnlocked) return;
+  const ctx = getAudioCtx();
+  if (ctx && ctx.state === 'suspended') {
+    ctx.resume().then(() => { state.audioUnlocked = true; });
+  } else {
+    state.audioUnlocked = true;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════
+   PIXEL RAIN CANVAS
+══════════════════════════════════════════════════════════ */
+const rainCanvas = document.getElementById('pixel-rain-canvas');
+const rainCtx = rainCanvas.getContext('2d');
+let rainActive = true;
+let rainPixels = [];
+
+const RAIN_COLORS = ['#f7d51d','#5dde24','#5ee7ff','#c084fc','#e53232','#ffffff','#f97316'];
+
+function initRain() {
+  rainCanvas.width = window.innerWidth;
+  rainCanvas.height = window.innerHeight;
+  rainPixels = [];
+  for (let i = 0; i < 60; i++) {
+    rainPixels.push({
+      x: Math.random() * rainCanvas.width,
+      y: Math.random() * rainCanvas.height - rainCanvas.height,
+      speed: 1 + Math.random() * 3,
+      size: 6,
+      color: RAIN_COLORS[Math.floor(Math.random() * RAIN_COLORS.length)]
+    });
+  }
+}
+
+let lastRainTime = 0;
+function animateRain(ts) {
+  if (!rainActive) { rainCtx.clearRect(0, 0, rainCanvas.width, rainCanvas.height); return; }
+  if (ts - lastRainTime < 33) { requestAnimationFrame(animateRain); return; } // ~30fps
+  lastRainTime = ts;
+  rainCtx.clearRect(0, 0, rainCanvas.width, rainCanvas.height);
+  rainPixels.forEach(p => {
+    p.y += p.speed;
+    if (p.y > rainCanvas.height) {
+      p.y = -p.size;
+      p.x = Math.random() * rainCanvas.width;
+      p.color = RAIN_COLORS[Math.floor(Math.random() * RAIN_COLORS.length)];
+    }
+    rainCtx.fillStyle = p.color;
+    rainCtx.fillRect(Math.round(p.x), Math.round(p.y), p.size, p.size);
+  });
+  requestAnimationFrame(animateRain);
+}
+
+window.addEventListener('resize', () => {
+  rainCanvas.width = window.innerWidth;
+  rainCanvas.height = window.innerHeight;
+});
+
+/* ══════════════════════════════════════════════════════════
+   WORLD MAP CANVAS
+══════════════════════════════════════════════════════════ */
+function drawWorldMap(completedRounds = 0) {
+  const canvas = document.getElementById('world-map-canvas');
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const levels = 10;
+  const cellW = canvas.width / levels;
+  const centerY = canvas.height / 2;
+
+  // Draw path
+  ctx.strokeStyle = '#828282';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  ctx.moveTo(cellW * 0.5, centerY);
+  ctx.lineTo(canvas.width - cellW * 0.5, centerY);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  for (let i = 0; i < levels; i++) {
+    const x = Math.round(cellW * i + cellW / 2);
+    const y = centerY;
+    const done = i < completedRounds;
+    const current = i === completedRounds;
+    const isBoss = i === 9;
+
+    // Node
+    ctx.fillStyle = isBoss ? '#e53232' : (done ? '#5dde24' : (current ? '#f7d51d' : '#828282'));
+    ctx.fillRect(x - 8, y - 8, 16, 16);
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x - 8, y - 8, 16, 16);
+
+    // Label
+    ctx.fillStyle = '#fff';
+    ctx.font = '6px "Press Start 2P"';
+    ctx.textAlign = 'center';
+    ctx.fillText(isBoss ? '⚠' : (i + 1), x, y + 2);
+  }
+}
+
+/* ══════════════════════════════════════════════════════════
+   SHUFFLE & ANSWER PREP
+══════════════════════════════════════════════════════════ */
+function fisherYates(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function prepareAnswers(q) {
+  if (q.type !== 'mcq') return q;
+  const shuffled = [...q.answers];
+  let attempts = 0;
+  do {
+    fisherYates(shuffled);
+    const newIdx = shuffled.findIndex(a => a === q.correctText);
+    const sameAsLast2 = lastCorrectPositions.length === 2
+      && lastCorrectPositions[0] === newIdx
+      && lastCorrectPositions[1] === newIdx;
+    if (!sameAsLast2 || attempts > 8) {
+      lastCorrectPositions.push(newIdx);
+      if (lastCorrectPositions.length > 2) lastCorrectPositions.shift();
+      q._shuffled = shuffled;
+      q._correctIdx = newIdx;
+      return q;
+    }
+    attempts++;
+  } while (true);
+}
+
+/* ══════════════════════════════════════════════════════════
+   SCREEN MANAGEMENT
+══════════════════════════════════════════════════════════ */
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  const el = document.getElementById(id);
+  if (el) el.classList.add('active');
+}
+
+/* ══════════════════════════════════════════════════════════
+   ACHIEVEMENT SYSTEM
+══════════════════════════════════════════════════════════ */
+const achievements = new Set();
+
+function showAchievement(text) {
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  toast.className = 'achievement-toast';
+  toast.textContent = text;
+  container.appendChild(toast);
+
+  // Fix container position
+  container.style.right = '1rem';
+
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => { toast.classList.add('show'); });
+  });
+
+  setTimeout(() => {
+    toast.style.transition = 'right 0.4s ease-in';
+    toast.style.right = '-320px';
+    setTimeout(() => toast.remove(), 450);
+  }, 2500);
+}
+
+function checkAchievements(context) {
+  if (context.firstCorrect && !achievements.has('first_blood')) {
+    achievements.add('first_blood');
+    showAchievement('⚡ FIRST BLOOD');
+  }
+  if (context.streak === 3 && !achievements.has('on_fire')) {
+    achievements.add('on_fire');
+    showAchievement('🔥 ON FIRE!');
+  }
+  if (context.streak === 5 && !achievements.has('data_wizard')) {
+    achievements.add('data_wizard');
+    showAchievement('★ DATA WIZARD');
+  }
+  if (context.speedDemon && !achievements.has('speed_demon')) {
+    achievements.add('speed_demon');
+    showAchievement('⏱ SPEED DEMON');
+  }
+  if (context.bullseye && !achievements.has('bullseye')) {
+    achievements.add('bullseye');
+    showAchievement('🎯 BULLSEYE!');
+  }
+  if (context.perfectSequence && !achievements.has('perfectly_sorted')) {
+    achievements.add('perfectly_sorted');
+    showAchievement('🔢 PERFECTLY SORTED');
+  }
+}
+
+/* ══════════════════════════════════════════════════════════
+   PARTICLE BURST
+══════════════════════════════════════════════════════════ */
+function spawnParticles(x, y) {
+  for (let i = 0; i < 12; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    const angle = (Math.PI * 2 * i / 12) - Math.PI / 2 + (Math.random() - 0.5) * 0.8;
+    const speed = 60 + Math.random() * 80;
+    const vx = Math.cos(angle) * speed;
+    const vy = Math.sin(angle) * speed - 60;
+    p.style.left = x + 'px';
+    p.style.top = y + 'px';
+    p.style.background = RAIN_COLORS[Math.floor(Math.random() * RAIN_COLORS.length)];
+    document.body.appendChild(p);
+
+    let startTime = null;
+    const duration = 900;
+    const gravity = 200;
+
+    function animP(ts) {
+      if (!startTime) startTime = ts;
+      const t = (ts - startTime) / 1000;
+      if (t >= duration / 1000) { p.remove(); return; }
+      const px = x + vx * t;
+      const py = y + vy * t + 0.5 * gravity * t * t;
+      const op = 1 - (t / (duration / 1000));
+      p.style.left = px + 'px';
+      p.style.top = py + 'px';
+      p.style.opacity = op;
+      requestAnimationFrame(animP);
+    }
+    requestAnimationFrame(animP);
+  }
+}
+
+/* ══════════════════════════════════════════════════════════
+   CONFETTI
+══════════════════════════════════════════════════════════ */
+function spawnConfetti() {
+  for (let i = 0; i < 25; i++) {
+    const c = document.createElement('div');
+    c.className = 'confetti-piece';
+    c.style.left = (Math.random() * 100) + 'vw';
+    c.style.top = '-20px';
+    c.style.background = RAIN_COLORS[Math.floor(Math.random() * RAIN_COLORS.length)];
+    const dur = 2 + Math.random() * 3;
+    const delay = Math.random() * 1.5;
+    c.style.animation = `confettiFall ${dur}s ${delay}s linear forwards`;
+    document.body.appendChild(c);
+    setTimeout(() => c.remove(), (dur + delay) * 1000 + 500);
+  }
+}
+
+/* ══════════════════════════════════════════════════════════
+   LIVES SYSTEM
+══════════════════════════════════════════════════════════ */
+function updateHearts() {
+  for (let i = 1; i <= 3; i++) {
+    const h = document.getElementById('heart-' + i);
+    h.className = 'heart';
+    if (i <= state.lives) h.classList.add('full');
+    else h.classList.add('empty');
+  }
+}
+
+function breakHeart() {
+  if (state.lives <= 0) return;
+  state.lives--;
+  const h = document.getElementById('heart-' + (state.lives + 1));
+  h.className = 'heart breaking';
+  setTimeout(() => {
+    h.className = 'heart empty';
+  }, 400);
+}
+
+/* ══════════════════════════════════════════════════════════
+   SCORE & HUD
+══════════════════════════════════════════════════════════ */
+function formatScore(n) {
+  return String(n).padStart(6, '0');
+}
+
+function updateScoreDisplay() {
+  document.getElementById('score-display').textContent = 'SCORE: ' + formatScore(state.score);
+}
+
+function updateStreakBadge() {
+  const badge = document.getElementById('streak-badge');
+  if (state.streak >= 2) {
+    badge.textContent = '⚡ ×' + state.streak;
+    badge.classList.add('visible');
+  } else {
+    badge.classList.remove('visible');
+  }
+}
+
+function updateXP() {
+  const pct = (state.round / 10) * 100;
+  document.getElementById('xp-bar').style.width = pct + '%';
+  document.getElementById('xp-label').textContent = state.round === 10 ? 'MAX LVL' : 'XP ' + state.round + '/10';
+}
+
+function updateWorldLabel(q) {
+  document.getElementById('world-label').textContent = 'WORLD ' + q.world;
+}
+
+/* ══════════════════════════════════════════════════════════
+   TYPEWRITER
+══════════════════════════════════════════════════════════ */
+function typewriterWrite(text, el, onDone) {
+  clearInterval(typewriterInterval);
+  fullQuestionText = text;
+  let i = 0;
+  el.textContent = '';
+  el.onclick = () => {
+    clearInterval(typewriterInterval);
+    el.textContent = text;
+    el.onclick = null;
+    if (onDone) onDone();
+  };
+  typewriterInterval = setInterval(() => {
+    el.textContent += text[i];
+    i++;
+    if (i >= text.length) {
+      clearInterval(typewriterInterval);
+      el.onclick = null;
+      if (onDone) onDone();
+    }
+  }, 16);
+}
+
+/* ══════════════════════════════════════════════════════════
+   TIMER
+══════════════════════════════════════════════════════════ */
+function startTimer(seconds, onExpire) {
+  clearInterval(timerInterval);
+  timerRemaining = seconds;
+  const bar = document.getElementById('timer-bar');
+  const txt = document.getElementById('timer-text');
+  bar.style.width = '100%';
+  bar.style.background = 'var(--green)';
+  bar.classList.remove('warning');
+  txt.textContent = seconds;
+
+  timerInterval = setInterval(() => {
+    timerRemaining--;
+    const pct = (timerRemaining / seconds) * 100;
+    bar.style.width = pct + '%';
+    txt.textContent = timerRemaining;
+
+    if (timerRemaining <= 8) {
+      bar.style.background = 'var(--red)';
+      bar.classList.add('warning');
+      playTick();
+    } else if (timerRemaining <= Math.floor(seconds * 0.4)) {
+      bar.style.background = '#ff9900';
+    }
+
+    if (timerRemaining <= 0) {
+      clearInterval(timerInterval);
+      if (onExpire) onExpire();
+    }
+  }, 1000);
+}
+
+function stopTimer() {
+  clearInterval(timerInterval);
+}
+
+/* ══════════════════════════════════════════════════════════
+   CHART RENDERING
+══════════════════════════════════════════════════════════ */
+function renderChart(q) {
+  const container = document.getElementById('chart-container');
+  const customViz = document.getElementById('custom-viz-container');
+  const chartCanvas = document.getElementById('chart-canvas');
+
+  if (!q.hasChart) {
+    container.style.display = 'none';
+    return;
+  }
+
+  if (currentChart) { currentChart.destroy(); currentChart = null; }
+  // Clean up previous dynamic elements
+  container.querySelectorAll('button').forEach(el => el.remove());
+  customViz.innerHTML = '';
+  customViz.style.display = 'none';
+  chartCanvas.style.display = 'block';
+  container.style.display = 'block';
+
+  // ── Round 1: Correlation — dual-axis line chart ──
+  if (q.round === 1) {
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const iceCream = [20,25,30,45,65,90,95,85,60,35,22,18];
+    const drowning = [8,10,12,18,28,42,45,38,25,14,9,7];
+
+    currentChart = new Chart(chartCanvas, {
+      type: 'line',
+      data: {
+        labels: months,
+        datasets: [
+          { label: 'Ice Cream Sales', data: iceCream, borderColor: '#f7d51d', backgroundColor: 'rgba(247,213,29,0.1)', yAxisID: 'y', tension: 0.4, pointRadius: 3 },
+          { label: 'Drowning Deaths', data: drowning, borderColor: '#e53232', backgroundColor: 'rgba(229,50,50,0.1)', yAxisID: 'y1', tension: 0.4, pointRadius: 3 }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: true,
+        plugins: { legend: { labels: { color: '#fff', font: { family: 'Space Mono', size: 9 } } } },
+        scales: {
+          x: { grid: { color: '#222' }, ticks: { color: '#828282', font: { size: 8 } } },
+          y: { type: 'linear', position: 'left', title: { display: true, text: 'Ice Cream Sales', color: '#f7d51d', font: { size: 9 } }, grid: { color: '#222' }, ticks: { color: '#f7d51d', font: { size: 8 } } },
+          y1: { type: 'linear', position: 'right', title: { display: true, text: 'Drowning Deaths', color: '#e53232', font: { size: 9 } }, grid: { drawOnChartArea: false }, ticks: { color: '#e53232', font: { size: 8 } } }
+        }
+      }
+    });
+
+    const revealBtn = document.createElement('button');
+    revealBtn.className = 'reveal-confound-btn';
+    revealBtn.id = 'reveal-confound-btn';
+    revealBtn.textContent = '► REVEAL CONFOUNDING VARIABLE';
+    container.appendChild(revealBtn);
+    revealBtn.addEventListener('click', () => {
+      const temp = [32,35,42,52,65,78,82,80,68,52,40,33];
+      currentChart.data.datasets.push({
+        label: 'Temperature (°F ÷ 2)',
+        data: temp,
+        borderColor: '#5ee7ff',
+        backgroundColor: 'rgba(94,231,255,0.1)',
+        yAxisID: 'y',
+        tension: 0.4,
+        pointRadius: 3,
+        borderDash: [5, 5]
+      });
+      currentChart.update();
+      revealBtn.textContent = '✓ CONFOUND REVEALED!';
+      revealBtn.style.borderColor = '#5ee7ff';
+      revealBtn.style.color = '#5ee7ff';
+      revealBtn.disabled = true;
+    });
+  }
+
+  // ── Round 2: Simpson's Paradox — bar chart with toggle ──
+  else if (q.round === 2) {
+    const aggregateData = {
+      labels: ['Hospital A', 'Hospital B'],
+      datasets: [{ label: 'Overall Survival Rate (%)', data: [83, 75], backgroundColor: ['rgba(94,231,255,0.7)','rgba(229,50,50,0.7)'], borderColor: ['#5ee7ff','#e53232'], borderWidth: 2 }]
+    };
+    const splitData = {
+      labels: ['Mild — A', 'Mild — B', 'Severe — A', 'Severe — B'],
+      datasets: [{ label: 'Survival Rate by Severity (%)', data: [90, 95, 30, 40], backgroundColor: ['rgba(94,231,255,0.5)','rgba(94,231,255,0.8)','rgba(229,50,50,0.5)','rgba(229,50,50,0.8)'], borderColor: ['#5ee7ff','#5ee7ff','#e53232','#e53232'], borderWidth: 2 }]
+    };
+    let simpsonMode = 'aggregate';
+
+    currentChart = new Chart(chartCanvas, {
+      type: 'bar',
+      data: aggregateData,
+      options: {
+        responsive: true, maintainAspectRatio: true,
+        plugins: { legend: { labels: { color: '#fff', font: { family: 'Space Mono', size: 9 } } } },
+        scales: {
+          x: { grid: { color: '#222' }, ticks: { color: '#828282', font: { size: 8 } } },
+          y: { min: 0, max: 100, grid: { color: '#222' }, ticks: { color: '#828282', font: { size: 8 } }, title: { display: true, text: 'Survival Rate %', color: '#828282', font: { size: 9 } } }
+        }
+      }
+    });
+
+    const toggleBtn = document.createElement('button');
+    toggleBtn.className = 'simpson-toggle';
+    toggleBtn.id = 'simpson-toggle';
+    toggleBtn.textContent = '▶ SPLIT BY SEVERITY (unlock after answering)';
+    toggleBtn.disabled = true;
+    container.appendChild(toggleBtn);
+    window._simpsonToggleBtn = toggleBtn;
+
+    toggleBtn.addEventListener('click', () => {
+      simpsonMode = simpsonMode === 'aggregate' ? 'split' : 'aggregate';
+      currentChart.data = simpsonMode === 'aggregate' ? aggregateData : splitData;
+      currentChart.update();
+      toggleBtn.textContent = simpsonMode === 'aggregate' ? '▶ SPLIT BY SEVERITY' : '▶ SHOW AGGREGATE';
+    });
+  }
+
+  // ── Round 4: Overfitting — animated loss curves ──
+  else if (q.round === 4) {
+    const epochs = Array.from({length: 20}, (_, i) => i + 1);
+    const trainLoss = epochs.map(e => Math.max(0.015, 2.5 * Math.exp(-0.32 * e) + 0.008 * Math.random()));
+    const valLoss = epochs.map(e => {
+      if (e <= 8) return 2.4 * Math.exp(-0.26 * e) + 0.07 * Math.random();
+      return 0.34 + (e - 8) * 0.024 + 0.04 * Math.random();
+    });
+
+    currentChart = new Chart(chartCanvas, {
+      type: 'line',
+      data: {
+        labels: epochs,
+        datasets: [
+          { label: 'Train Loss', data: trainLoss, borderColor: '#5dde24', backgroundColor: 'rgba(93,222,36,0.1)', tension: 0.4, pointRadius: 2, fill: false },
+          { label: 'Val Loss (diverges!)', data: valLoss, borderColor: '#e53232', backgroundColor: 'rgba(229,50,50,0.1)', tension: 0.4, pointRadius: 2, fill: false }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: true,
+        animation: { duration: 1800, easing: 'easeInOutQuart' },
+        plugins: { legend: { labels: { color: '#fff', font: { family: 'Space Mono', size: 9 } } } },
+        scales: {
+          x: { title: { display: true, text: 'Epoch', color: '#828282', font: { size: 9 } }, grid: { color: '#222' }, ticks: { color: '#828282', font: { size: 8 } } },
+          y: { title: { display: true, text: 'Loss', color: '#828282', font: { size: 9 } }, grid: { color: '#222' }, ticks: { color: '#828282', font: { size: 8 } } }
+        }
+      }
+    });
+  }
+
+  // ── Round 5: Survivorship Bias — pixel art canvas ──
+  else if (q.round === 5) {
+    chartCanvas.style.display = 'none';
+    customViz.style.display = 'block';
+
+    const cvs = document.createElement('canvas');
+    cvs.width = 580;
+    cvs.height = 200;
+    cvs.style.width = '100%';
+    cvs.style.imageRendering = 'pixelated';
+    customViz.appendChild(cvs);
+
+    const ctx = cvs.getContext('2d');
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, cvs.width, cvs.height);
+
+    function drawPlane(x, y, color, alpha) {
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = color;
+      // Fuselage
+      ctx.fillRect(x+30, y+38, 100, 22);
+      // Wings
+      ctx.fillRect(x+48, y+18, 64, 42);
+      // Tail fin
+      ctx.fillRect(x+118, y+28, 28, 22);
+      ctx.fillRect(x+124, y+16, 10, 32);
+      // Nose
+      ctx.fillRect(x+16, y+42, 18, 14);
+      // Cockpit
+      ctx.fillStyle = '#000';
+      ctx.globalAlpha = alpha * 0.8;
+      ctx.fillRect(x+36, y+40, 22, 14);
+      ctx.restore();
+    }
+
+    function drawBulletHole(x, y, col) {
+      ctx.fillStyle = col;
+      ctx.beginPath();
+      ctx.arc(x, y, 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+
+    // Ghosted crashed bomber (red) — engine hit
+    drawPlane(10, 90, '#e53232', 0.35);
+    drawBulletHole(10+98, 90+49, '#ff4444');
+    drawBulletHole(10+105, 90+44, '#ff4444');
+
+    ctx.fillStyle = 'rgba(229,50,50,0.6)';
+    ctx.font = '9px monospace';
+    ctx.fillText('CRASHED (never returned)', 8, 88);
+    ctx.fillStyle = 'rgba(229,50,50,0.9)';
+    ctx.font = '9px monospace';
+    ctx.fillText('Engine hit', 10+85, 90+70);
+
+    // Returning bomber (blue) — wing/fuselage hits
+    drawPlane(300, 60, '#5ee7ff', 1.0);
+    // Wing bullet holes
+    drawBulletHole(300+55, 60+25, '#f7d51d');
+    drawBulletHole(300+72, 60+22, '#f7d51d');
+    drawBulletHole(300+89, 60+28, '#f7d51d');
+    drawBulletHole(300+65, 60+35, '#f7d51d');
+    // Fuselage hits
+    drawBulletHole(300+60, 60+46, '#f7d51d');
+    drawBulletHole(300+78, 60+50, '#f7d51d');
+
+    ctx.fillStyle = '#5ee7ff';
+    ctx.font = '9px monospace';
+    ctx.fillText('RETURNING BOMBER (survived)', 300, 56);
+    ctx.fillStyle = '#f7d51d';
+    ctx.font = '8px monospace';
+    ctx.fillText('= bullet holes', 300+100, 60+18);
+
+    ctx.fillStyle = '#c084fc';
+    ctx.font = '8px monospace';
+    ctx.fillText('Data only shows planes that came back!', 20, 190);
+  }
+
+  // ── Round 7: R² — scatter plot (existing) ──
+  else if (q.round === 7) {
+    const points = [];
+    for (let i = 0; i < 60; i++) {
+      const x = Math.random() * 10;
+      const noise = (Math.random() - 0.5) * 5;
+      const y = x * 0.7 * 1.1 + noise;
+      points.push({ x: parseFloat(x.toFixed(2)), y: parseFloat(Math.max(0, y).toFixed(2)) });
+    }
+    currentChart = new Chart(chartCanvas, {
+      type: 'scatter',
+      data: { datasets: [{ label: 'Study Hours vs Score (r=0.70)', data: points, backgroundColor: 'rgba(94,231,255,0.6)', borderColor: '#5ee7ff', pointRadius: 4, pointHoverRadius: 6 }] },
+      options: {
+        responsive: true, maintainAspectRatio: true,
+        plugins: { legend: { labels: { color: '#fff', font: { family: 'Space Mono', size: 10 } } } },
+        scales: {
+          x: { title: { display: true, text: 'Study Hours', color: '#828282', font: { family: 'Space Mono' } }, grid: { color: '#222' }, ticks: { color: '#828282' } },
+          y: { title: { display: true, text: 'Exam Score', color: '#828282', font: { family: 'Space Mono' } }, grid: { color: '#222' }, ticks: { color: '#828282' } }
+        }
+      }
+    });
+  }
+
+  // ── Round 8: Skewed Distribution — salary histogram ──
+  else if (q.round === 8) {
+    const labels = [];
+    const data = [];
+    for (let i = 40; i <= 80; i++) {
+      labels.push('$' + i + 'k');
+      const z = (i - 54) / 8;
+      data.push(Math.max(0, Math.round(14 * Math.exp(-0.5 * z * z) + Math.random() * 1.5)));
+    }
+    labels.push('$800k+');
+    data.push(5);
+
+    const meanIdx = labels.indexOf('$95k'); // won't find it (out of range), so we mark it differently
+    const medIdx = 14; // $54k is index 14 (40+14=54)
+
+    currentChart = new Chart(chartCanvas, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Employees',
+          data,
+          backgroundColor: data.map((_, i) => i === data.length - 1 ? 'rgba(229,50,50,0.8)' : 'rgba(94,231,255,0.5)'),
+          borderColor: data.map((_, i) => i === data.length - 1 ? '#e53232' : '#5ee7ff'),
+          borderWidth: 1
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: true,
+        plugins: {
+          legend: { labels: { color: '#fff', font: { family: 'Space Mono', size: 9 } } }
+        },
+        scales: {
+          x: { grid: { color: '#222' }, ticks: { color: '#828282', font: { size: 7 }, maxTicksLimit: 12 } },
+          y: { grid: { color: '#222' }, ticks: { color: '#828282', font: { size: 8 } }, title: { display: true, text: 'Employees', color: '#828282', font: { size: 9 } } }
+        }
+      },
+      plugins: [{
+        afterDraw(chart) {
+          const ctx2 = chart.ctx;
+          const xAxis = chart.scales.x;
+          const yAxis = chart.scales.y;
+          // Median line at $54k (index 14)
+          const medX = xAxis.getPixelForValue(medIdx);
+          ctx2.save();
+          ctx2.strokeStyle = '#5dde24';
+          ctx2.lineWidth = 2;
+          ctx2.setLineDash([5, 4]);
+          ctx2.beginPath();
+          ctx2.moveTo(medX, yAxis.top);
+          ctx2.lineTo(medX, yAxis.bottom);
+          ctx2.stroke();
+          ctx2.setLineDash([]);
+          ctx2.fillStyle = '#5dde24';
+          ctx2.font = '8px Space Mono';
+          ctx2.fillText('Median $54k', medX + 2, yAxis.top + 14);
+          // Mean line — well past $80k, visually off-chart; draw at far right
+          const meanX = xAxis.getPixelForValue(data.length - 1) - 5;
+          ctx2.strokeStyle = '#e53232';
+          ctx2.lineWidth = 2;
+          ctx2.setLineDash([5, 4]);
+          ctx2.beginPath();
+          ctx2.moveTo(meanX, yAxis.top);
+          ctx2.lineTo(meanX, yAxis.bottom);
+          ctx2.stroke();
+          ctx2.setLineDash([]);
+          ctx2.fillStyle = '#e53232';
+          ctx2.font = '8px Space Mono';
+          ctx2.fillText('Mean $95k+', meanX - 55, yAxis.top + 14);
+          ctx2.restore();
+        }
+      }]
+    });
+  }
+
+  // ── Round 9: Accuracy Paradox — fraud grid + confusion matrix ──
+  else if (q.round === 9) {
+    chartCanvas.style.display = 'none';
+    customViz.style.display = 'block';
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'fraud-grid-wrapper';
+
+    // 10×10 grid
+    const grid = document.createElement('div');
+    grid.className = 'fraud-grid';
+    for (let i = 0; i < 100; i++) {
+      const cell = document.createElement('div');
+      cell.className = 'fraud-cell ' + (i === 50 ? 'fraud' : 'not-fraud');
+      grid.appendChild(cell);
+    }
+
+    // Legend
+    const legend = document.createElement('div');
+    legend.style.cssText = 'font-family:Space Mono,monospace;font-size:0.5rem;color:#ccc;text-align:center;line-height:2';
+    legend.innerHTML = '<span style="color:#5ee7ff">■</span> Not Fraud (99) &nbsp; <span style="color:#e53232">■</span> Fraud (1)';
+
+    // Confusion matrix
+    const table = document.createElement('table');
+    table.className = 'cm-table';
+    table.innerHTML = `
+      <tr><th></th><th>Pred: Not Fraud</th><th>Pred: Fraud</th></tr>
+      <tr><td>Actual: Not Fraud</td><td>TN = 99</td><td>FP = 0</td></tr>
+      <tr><td>Actual: Fraud</td><td class="cm-fn">FN = 1</td><td class="cm-tp">TP = 0</td></tr>
+    `;
+
+    const stats = document.createElement('div');
+    stats.className = 'cm-stats';
+    stats.textContent = 'Accuracy: 99% · Precision: N/A · Recall: 0%';
+
+    wrapper.appendChild(grid);
+    wrapper.appendChild(legend);
+    wrapper.appendChild(table);
+    wrapper.appendChild(stats);
+    customViz.appendChild(wrapper);
+  }
+}
+
+/* ══════════════════════════════════════════════════════════
+   RENDER MCQ
+══════════════════════════════════════════════════════════ */
+function renderMCQ(q) {
+  const area = document.getElementById('answers-area');
+  area.innerHTML = '';
+  const labels = ['A', 'B', 'C', 'D'];
+  q._shuffled.forEach((ans, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'mcq-btn';
+    btn.textContent = labels[i] + ') ' + ans;
+    btn.dataset.idx = i;
+    btn.addEventListener('click', () => handleMCQClick(btn, i, q));
+    area.appendChild(btn);
+  });
+}
+
+function handleMCQClick(btn, idx, q) {
+  unlockAudio();
+  stopTimer();
+  const timeBonus = Math.max(0, Math.floor(timerRemaining * 3));
+  const correct = idx === q._correctIdx;
+  const allBtns = document.querySelectorAll('.mcq-btn');
+
+  allBtns.forEach(b => b.disabled = true);
+  allBtns[q._correctIdx].classList.add('correct');
+
+  if (correct) {
+    handleCorrect(btn, q, timeBonus);
+  } else {
+    btn.classList.add('wrong');
+    handleWrong(q);
+  }
+}
+
+/* ══════════════════════════════════════════════════════════
+   RENDER SEQUENCE
+══════════════════════════════════════════════════════════ */
+let sequenceSelected = [];
+let sequencePerfect = true;
+
+function renderSequence(q) {
+  sequenceSelected = [];
+  sequencePerfect = true;
+  const area = document.getElementById('answers-area');
+  area.innerHTML = '';
+
+  const container = document.createElement('div');
+  container.className = 'sequence-container';
+
+  // Shuffled chips
+  const chips = [...q.chips];
+  fisherYates(chips);
+
+  const chipsRow = document.createElement('div');
+  chipsRow.className = 'sequence-chips';
+
+  chips.forEach(val => {
+    const chip = document.createElement('button');
+    chip.className = 'seq-chip';
+    chip.textContent = val;
+    chip.dataset.val = val;
+    chip.addEventListener('click', () => handleSequenceClick(chip, q, slotsRow));
+    chipsRow.appendChild(chip);
+  });
+
+  // Slots
+  const slotsRow = document.createElement('div');
+  slotsRow.className = 'sequence-slots';
+  const ordinals = ['①', '②', '③', '④'];
+  for (let i = 0; i < q.correctOrder.length; i++) {
+    const slot = document.createElement('div');
+    slot.className = 'seq-slot';
+    slot.innerHTML = `<span class="slot-number">${ordinals[i]}</span><div class="slot-value" id="slot-${i}">___</div>`;
+    slotsRow.appendChild(slot);
+  }
+
+  container.appendChild(chipsRow);
+  container.appendChild(slotsRow);
+  area.appendChild(container);
+}
+
+function handleSequenceClick(chip, q, slotsRow) {
+  unlockAudio();
+  const val = chip.dataset.val;
+  const pos = sequenceSelected.length;
+  const correct = val === q.correctOrder[pos];
+
+  if (!correct) {
+    sequencePerfect = false;
+    chip.classList.add('shake-wrong');
+    setTimeout(() => chip.classList.remove('shake-wrong'), 350);
+    playWrong();
+    return;
+  }
+
+  sequenceSelected.push(val);
+  chip.classList.add('used');
+  chip.disabled = true;
+
+  const slotEl = document.getElementById('slot-' + (pos));
+  if (slotEl) {
+    slotEl.textContent = val;
+    slotEl.classList.add('filled');
+  }
+
+  if (sequenceSelected.length === q.correctOrder.length) {
+    stopTimer();
+    const timeBonus = Math.max(0, Math.floor(timerRemaining * 3));
+    const perChip = 25;
+    const pts = perChip * q.correctOrder.length;
+
+    // Show all slots as correct
+    q.correctOrder.forEach((_, i) => {
+      const s = document.getElementById('slot-' + i);
+      if (s) s.classList.add('correct');
+    });
+
+    const baseScore = pts + timeBonus;
+
+    if (sequencePerfect) {
+      checkAchievements({ perfectSequence: true });
+    }
+
+    finalizeCorrect(null, q, baseScore, timeBonus);
+  }
+}
+
+/* ══════════════════════════════════════════════════════════
+   RENDER SLIDER
+══════════════════════════════════════════════════════════ */
+let sliderTouched = false;
+
+function renderSlider(q) {
+  sliderTouched = false;
+  const area = document.getElementById('answers-area');
+  area.innerHTML = '';
+
+  const container = document.createElement('div');
+  container.className = 'slider-container';
+
+  const readout = document.createElement('div');
+  readout.className = 'slider-readout';
+  readout.id = 'slider-readout';
+  readout.textContent = 'YOUR ANSWER: 50%';
+
+  const wrap = document.createElement('div');
+  wrap.className = 'pixel-slider-wrap';
+
+  const fill = document.createElement('div');
+  fill.className = 'slider-track-fill';
+  fill.id = 'slider-fill';
+  fill.style.width = '50%';
+
+  const slider = document.createElement('input');
+  slider.type = 'range';
+  slider.className = 'pixel-slider';
+  slider.id = 'main-slider';
+  slider.min = q.sliderMin;
+  slider.max = q.sliderMax;
+  slider.value = 50;
+
+  slider.addEventListener('input', () => {
+    const val = parseInt(slider.value);
+    readout.textContent = 'YOUR ANSWER: ' + val + '%';
+    fill.style.width = val + '%';
+    if (!sliderTouched) {
+      sliderTouched = true;
+      submitBtn.classList.add('visible');
+    }
+  });
+
+  const labels = document.createElement('div');
+  labels.className = 'slider-labels';
+  labels.innerHTML = `<span>${q.sliderMin}%</span><span>${q.sliderMax}%</span>`;
+
+  wrap.appendChild(fill);
+  wrap.appendChild(slider);
+
+  const submitBtn = document.createElement('button');
+  submitBtn.className = 'slider-submit-btn';
+  submitBtn.id = 'slider-submit';
+  submitBtn.textContent = '► SUBMIT';
+  submitBtn.addEventListener('click', () => handleSliderSubmit(slider, q, submitBtn, readout));
+
+  const feedback = document.createElement('div');
+  feedback.className = 'slider-feedback';
+  feedback.id = 'slider-feedback';
+
+  container.appendChild(readout);
+  container.appendChild(wrap);
+  container.appendChild(labels);
+  container.appendChild(submitBtn);
+  container.appendChild(feedback);
+  area.appendChild(container);
+}
+
+function handleSliderSubmit(slider, q, submitBtn, readout) {
+  unlockAudio();
+  stopTimer();
+  const val = parseInt(slider.value);
+  const diff = Math.abs(val - q.correctValue);
+  slider.disabled = true;
+  submitBtn.disabled = true;
+  const timeBonus = Math.max(0, Math.floor(timerRemaining * 2));
+
+  const feedback = document.getElementById('slider-feedback');
+  feedback.style.display = 'block';
+
+  let pts = 0;
+  let msg = '';
+  let isCorrect = false;
+
+  if (diff <= q.tolerance.full) {
+    pts = 100 + timeBonus;
+    isCorrect = true;
+    msg = '🎯 BULLSEYE! ' + val + '% — Correct answer: ' + q.correctValue + '%';
+    feedback.style.color = 'var(--green)';
+    feedback.style.borderColor = 'var(--green)';
+    checkAchievements({ bullseye: diff <= 2 });
+    playCorrect();
+  } else if (diff <= q.tolerance.half) {
+    pts = 50 + Math.floor(timeBonus / 2);
+    isCorrect = true;
+    msg = '✓ CLOSE! ' + val + '% — Correct answer: ' + q.correctValue + '%';
+    feedback.style.color = '#ff9900';
+    feedback.style.borderColor = '#ff9900';
+    playCorrect();
+  } else {
+    pts = 0;
+    msg = '✗ MISSED — Correct answer: ' + q.correctValue + '% (R² = 0.70² = 0.49)';
+    feedback.style.color = 'var(--red)';
+    feedback.style.borderColor = 'var(--red)';
+    playWrong();
+  }
+
+  feedback.textContent = msg;
+
+  if (isCorrect) {
+    finalizeCorrect(null, q, pts, timeBonus);
+  } else {
+    handleWrong(q);
+    document.getElementById('next-btn').classList.add('visible');
+  }
+}
+
+/* ══════════════════════════════════════════════════════════
+   RENDER RAPIDFIRE
+══════════════════════════════════════════════════════════ */
+let rfStatementIndex = 0;
+let rfAnsweredCorrect = 0;
+
+function renderRapidfire(q) {
+  rfStatementIndex = 0;
+  rfAnsweredCorrect = 0;
+  state.rfScore = 0;
+  state.rfCorrect = 0;
+
+  const area = document.getElementById('answers-area');
+  area.innerHTML = '';
+
+  const container = document.createElement('div');
+  container.className = 'rapidfire-container';
+
+  const header = document.createElement('div');
+  header.className = 'rf-header';
+  header.id = 'rf-header';
+  header.textContent = '⚡ LIGHTNING ROUND ⚡';
+
+  const countEl = document.createElement('div');
+  countEl.className = 'rf-statement-count';
+  countEl.id = 'rf-count';
+  countEl.textContent = '1/' + q.statements.length;
+
+  const stmt = document.createElement('div');
+  stmt.className = 'rf-statement';
+  stmt.id = 'rf-statement';
+
+  const rfTimer = document.createElement('div');
+  rfTimer.className = 'rf-timer-container';
+  const rfBar = document.createElement('div');
+  rfBar.className = 'rf-timer-bar';
+  rfBar.id = 'rf-bar';
+  rfTimer.appendChild(rfBar);
+
+  const btns = document.createElement('div');
+  btns.className = 'rf-buttons';
+  const yesBtn = document.createElement('button');
+  yesBtn.className = 'rf-btn yes-btn';
+  yesBtn.textContent = 'TRUE';
+  yesBtn.id = 'rf-yes';
+  const noBtn = document.createElement('button');
+  noBtn.className = 'rf-btn no-btn';
+  noBtn.textContent = 'FALSE';
+  noBtn.id = 'rf-no';
+
+  btns.appendChild(yesBtn);
+  btns.appendChild(noBtn);
+
+  container.appendChild(header);
+  container.appendChild(countEl);
+  container.appendChild(stmt);
+  container.appendChild(rfTimer);
+  container.appendChild(btns);
+  area.appendChild(container);
+
+  yesBtn.addEventListener('click', () => handleRFAnswer(true, q));
+  noBtn.addEventListener('click', () => handleRFAnswer(false, q));
+
+  showRFStatement(q, 0);
+}
+
+function showRFStatement(q, idx) {
+  unlockAudio();
+  const stmt = document.getElementById('rf-statement');
+  const count = document.getElementById('rf-count');
+  const bar = document.getElementById('rf-bar');
+
+  rfStatementIndex = idx;
+  stmt.textContent = q.statements[idx].text;
+  count.textContent = (idx + 1) + '/' + q.statements.length;
+
+  const yes = document.getElementById('rf-yes');
+  const no = document.getElementById('rf-no');
+  if (yes) yes.disabled = false;
+  if (no) no.disabled = false;
+
+  bar.style.transition = 'none';
+  bar.style.width = '100%';
+  setTimeout(() => {
+    bar.style.transition = 'width 5s linear';
+    bar.style.width = '0%';
+  }, 50);
+
+  clearInterval(rfTimerInterval);
+  let t = 5;
+  rfTimerInterval = setInterval(() => {
+    t--;
+    if (t <= 0) {
+      clearInterval(rfTimerInterval);
+      handleRFTimeout(q);
+    }
+  }, 1000);
+}
+
+function handleRFAnswer(answer, q) {
+  clearInterval(rfTimerInterval);
+  unlockAudio();
+  const yes = document.getElementById('rf-yes');
+  const no = document.getElementById('rf-no');
+  if (yes) yes.disabled = true;
+  if (no) no.disabled = true;
+
+  const statement = q.statements[rfStatementIndex];
+  const correct = answer === statement.answer;
+
+  if (correct) {
+    state.rfScore += 50;
+    state.rfCorrect++;
+    showRFMiniScore('+50');
+    playCorrect();
+  } else {
+    playWrong();
+  }
+
+  setTimeout(() => advanceRF(q), 600);
+}
+
+function handleRFTimeout(q) {
+  const yes = document.getElementById('rf-yes');
+  const no = document.getElementById('rf-no');
+  if (yes) yes.disabled = true;
+  if (no) no.disabled = true;
+  playWrong();
+  setTimeout(() => advanceRF(q), 600);
+}
+
+function advanceRF(q) {
+  const nextIdx = rfStatementIndex + 1;
+  if (nextIdx < q.statements.length) {
+    showRFStatement(q, nextIdx);
+  } else {
+    // RF round complete
+    stopTimer();
+    const totalPts = state.rfScore;
+    const allCorrect = state.rfCorrect === q.statements.length;
+    state.score += totalPts;
+    state.totalCorrect += state.rfCorrect;
+    updateScoreDisplay();
+
+    showFeedback(allCorrect, q.statements.map(s => s.explanation).join(' | '), true, q);
+    document.getElementById('next-btn').classList.add('visible');
+    updateXP();
+    drawWorldMap(state.round);
+
+    if (allCorrect) {
+      state.streak++;
+      updateStreakBadge();
+    } else {
+      state.streak = 0;
+      updateStreakBadge();
+    }
+  }
+}
+
+function showRFMiniScore(text) {
+  const el = document.createElement('div');
+  el.className = 'rf-mini-score';
+  el.textContent = text;
+  el.style.left = (Math.random() * 200 + 300) + 'px';
+  el.style.top = '200px';
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 1000);
+}
+
+/* ══════════════════════════════════════════════════════════
+   CORRECT / WRONG HANDLERS
+══════════════════════════════════════════════════════════ */
+function handleCorrect(btn, q, timeBonus) {
+  const streakMult = Math.min(state.streak + 1, 5);
+  const baseScore = 100 + timeBonus;
+  const finalScore = Math.round(baseScore * (1 + (streakMult - 1) * 0.2));
+
+  if (btn) {
+    const rect = btn.getBoundingClientRect();
+    spawnParticles(rect.left + rect.width / 2, rect.top + rect.height / 2);
+  }
+
+  finalizeCorrect(btn, q, finalScore, timeBonus);
+}
+
+function finalizeCorrect(btn, q, pts, timeBonus) {
+  state.score += pts;
+  state.streak++;
+  state.totalCorrect++;
+  if (state.streak > state.maxStreak) state.maxStreak = state.streak;
+  state.correctAnswerTimes.push(timerRemaining);
+  if (q && (q.type === 'sequence' || q.type === 'slider' || q.type === 'rapidfire')) {
+    state.specialQCorrect++;
+  }
+  updateScoreDisplay();
+  updateStreakBadge();
+  updateXP();
+  drawWorldMap(state.round);
+
+  const isFirst = !state.firstAnswerGiven;
+  state.firstAnswerGiven = true;
+
+  const elapsedTime = q ? q.timerSeconds - timerRemaining : 0;
+  checkAchievements({
+    firstCorrect: isFirst,
+    streak: state.streak,
+    speedDemon: elapsedTime < 5
+  });
+
+  if (state.streak === 3 || state.streak === 5) playStreak();
+  else playCorrect();
+
+  showFeedback(true, q ? q.explanation : '', false, q);
+  document.getElementById('next-btn').classList.add('visible');
+}
+
+function handleWrong(q) {
+  breakHeart();
+  state.streak = 0;
+  updateStreakBadge();
+  playWrong();
+
+  const card = document.getElementById('game-card');
+  card.classList.add('shake');
+  setTimeout(() => card.classList.remove('shake'), 500);
+
+  showFeedback(false, q.explanation, false, q);
+  document.getElementById('next-btn').classList.add('visible');
+}
+
+/* ══════════════════════════════════════════════════════════
+   FEEDBACK
+══════════════════════════════════════════════════════════ */
+function showFeedback(correct, explanation, isRF = false, q = null) {
+  const fb = document.getElementById('answer-feedback');
+  const header = document.getElementById('feedback-header');
+  const expl = document.getElementById('explanation-text');
+
+  fb.style.display = 'block';
+  fb.className = 'answer-feedback ' + (correct ? 'correct' : 'wrong');
+  header.textContent = correct ? '✓ CORRECT!' : '✗ WRONG!';
+  expl.textContent = explanation;
+
+  // Remove any existing wild callout
+  const oldCallout = fb.querySelector('.wild-callout');
+  if (oldCallout) oldCallout.remove();
+
+  // Inject wild callout if question has one
+  const activeQ = q || currentQ;
+  if (activeQ && activeQ.wildCallout) {
+    const callout = document.createElement('div');
+    callout.className = 'wild-callout';
+    callout.innerHTML = '<div class="wild-callout-header">IN THE WILD</div>' +
+      '<div class="wild-callout-body">' + activeQ.wildCallout + '</div>';
+    fb.appendChild(callout);
+  }
+
+  // Enable Simpson's Paradox toggle after answering
+  if (window._simpsonToggleBtn) {
+    window._simpsonToggleBtn.disabled = false;
+    window._simpsonToggleBtn.textContent = '▶ SPLIT BY SEVERITY';
+    window._simpsonToggleBtn = null;
+  }
+
+  // Show reveal confound button after answering (Round 1)
+  const revealBtn = document.getElementById('reveal-confound-btn');
+  if (revealBtn) revealBtn.classList.add('visible');
+}
+
+/* ══════════════════════════════════════════════════════════
+   LOAD QUESTION
+══════════════════════════════════════════════════════════ */
+function loadQuestion(idx) {
+  const q = state.questions[idx];
+  currentQ = q;
+
+  // Reset UI
+  document.getElementById('answer-feedback').style.display = 'none';
+  document.getElementById('next-btn').classList.remove('visible');
+  document.getElementById('chart-container').style.display = 'none';
+  window._simpsonToggleBtn = null;
+
+  // Prepare
+  if (q.type === 'mcq') prepareAnswers(q);
+
+  // Update HUD
+  document.getElementById('round-label').textContent = 'ROUND ' + q.round + '/10';
+  document.getElementById('topic-label').textContent = q.topic;
+  updateWorldLabel(q);
+
+  // Difficulty stars
+  const existing = document.getElementById('difficulty-stars');
+  if (existing) existing.remove();
+  if (q.difficulty) {
+    const stars = document.createElement('div');
+    stars.id = 'difficulty-stars';
+    stars.className = 'difficulty-stars';
+    stars.textContent = q.difficulty;
+    document.querySelector('.round-header').appendChild(stars);
+  }
+
+  // Render chart
+  renderChart(q);
+
+  // Typewriter question
+  const qEl = document.getElementById('question-text');
+  typewriterWrite(q.question, qEl, () => {
+    // Render answers after typewriter finishes (or immediately for special types)
+    renderAnswersByType(q);
+  });
+
+  // For rapid fire, answers render during typewriter since they need to be visible quickly
+  if (q.type !== 'rapidfire') {
+    renderAnswersByType(q);
+  }
+
+  // Start timer
+  startTimer(q.timerSeconds, () => onTimerExpired(q));
+}
+
+function renderAnswersByType(q) {
+  document.getElementById('answers-area').innerHTML = '';
+  if (q.type === 'mcq') renderMCQ(q);
+  else if (q.type === 'sequence') renderSequence(q);
+  else if (q.type === 'slider') renderSlider(q);
+  else if (q.type === 'rapidfire') renderRapidfire(q);
+}
+
+function onTimerExpired(q) {
+  if (q.type === 'mcq') {
+    const allBtns = document.querySelectorAll('.mcq-btn');
+    allBtns.forEach(b => b.disabled = true);
+    if (q._correctIdx !== undefined) allBtns[q._correctIdx].classList.add('correct');
+    handleWrong(q);
+  } else if (q.type === 'slider') {
+    // Auto-submit at current value
+    const slider = document.getElementById('main-slider');
+    const submitBtn = document.getElementById('slider-submit');
+    if (slider && !slider.disabled) handleSliderSubmit(slider, q, submitBtn, null);
+  }
+  // sequence and rapidfire handle their own timeouts
+}
+
+/* ══════════════════════════════════════════════════════════
+   NEXT QUESTION / ADVANCE
+══════════════════════════════════════════════════════════ */
+function advanceRound() {
+  state.round++;
+  if (state.round > 10) {
+    showResults();
+    return;
+  }
+
+  const q = state.questions[state.round - 1];
+
+  if (q.isBoss) {
+    showScreen('boss-screen');
+    playBoss();
+    setTimeout(() => {
+      showScreen('game-screen');
+      loadQuestion(state.round - 1);
+    }, 1800);
+    return;
+  }
+
+  if (q.type === 'rapidfire') {
+    showScreen('lightning-screen');
+    setTimeout(() => {
+      showScreen('game-screen');
+      loadQuestion(state.round - 1);
+    }, 1800);
+    return;
+  }
+
+  loadQuestion(state.round - 1);
+}
+
+/* ══════════════════════════════════════════════════════════
+   RESULTS SCREEN
+══════════════════════════════════════════════════════════ */
+function getRank(score) {
+  if (score >= 1200) return 'DATA WIZARD SUPREME';
+  if (score >= 1000) return 'MASTER ANALYST';
+  if (score >= 800) return 'SENIOR DATA SCIENTIST';
+  if (score >= 600) return 'DATA SCIENTIST';
+  if (score >= 400) return 'DATA ANALYST';
+  if (score >= 200) return 'JUNIOR ANALYST';
+  return 'DATA APPRENTICE';
+}
+
+function getHeartsMessage() {
+  if (state.lives === 3) return 'FLAWLESS BONUS +200 PTS';
+  if (state.lives === 1) return 'THAT WAS CLOSE!';
+  if (state.lives === 0) return 'BARELY MADE IT!';
+  return '';
+}
+
+function animateScoreCounter(target, el, onDone) {
+  const duration = 1500;
+  const start = performance.now();
+  function tick(now) {
+    const elapsed = now - start;
+    const progress = Math.min(elapsed / duration, 1);
+    // Ease out cubic
+    const eased = 1 - Math.pow(1 - progress, 3);
+    const current = Math.round(eased * target);
+    el.textContent = formatScore(current);
+    if (progress < 1) requestAnimationFrame(tick);
+    else { el.textContent = formatScore(target); if (onDone) onDone(); }
+  }
+  requestAnimationFrame(tick);
+}
+
+function revealTextLetterByLetter(text, el, interval = 80) {
+  el.textContent = '';
+  let i = 0;
+  const iv = setInterval(() => {
+    el.textContent += text[i];
+    i++;
+    if (i >= text.length) clearInterval(iv);
+  }, interval);
+}
+
+function showResults() {
+  rainActive = false;
+  // Flawless bonus
+  if (state.lives === 3) state.score += 200;
+
+  // Check flawless all correct achievement
+  if (state.totalCorrect >= 10) checkAchievements({ flawless: true });
+
+  showScreen('results-screen');
+  spawnConfetti();
+  playLevelUp();
+
+  const finalScore = state.score;
+  const rank = getRank(finalScore);
+  const heartsMsg = getHeartsMessage();
+
+  if (state.lives === 3) {
+    document.getElementById('flawless-banner').classList.add('visible');
+  }
+
+  // Radar chart
+  renderRadarChart();
+
+  // Percentile badge
+  const perc = getPercentile(finalScore);
+  document.getElementById('percentile-badge').textContent = perc.emoji + ' ' + perc.label;
+
+  // Animate score
+  animateScoreCounter(finalScore, document.getElementById('final-score-display'), () => {
+    revealTextLetterByLetter(rank, document.getElementById('rank-display'), 80);
+  });
+
+  document.getElementById('result-badge').textContent = heartsMsg;
+  document.getElementById('results-breakdown').innerHTML =
+    `Correct Answers: ${state.totalCorrect} / 10<br>` +
+    `Final Score: ${formatScore(finalScore)}<br>` +
+    `Lives Remaining: ${'❤️'.repeat(state.lives)}${'🖤'.repeat(3 - state.lives)}<br>` +
+    `Best Streak: ${state.maxStreak}`;
+
+  document.getElementById('performance-insights').innerHTML = getPerformanceInsight();
+
+  drawWorldMap(10);
+}
+
+/* ══════════════════════════════════════════════════════════
+   GAME INIT
+══════════════════════════════════════════════════════════ */
+function startGame() {
+  unlockAudio();
+  rainActive = false;
+
+  // Reset state
+  state.score = 0;
+  state.lives = 3;
+  state.streak = 0;
+  state.round = 1;
+  state.firstAnswerGiven = false;
+  state.totalCorrect = 0;
+  state.answers = [];
+  state.maxStreak = 0;
+  state.correctAnswerTimes = [];
+  state.specialQCorrect = 0;
+  lastCorrectPositions = [];
+  achievements.clear();
+  window._simpsonToggleBtn = null;
+
+  // Deep copy questions
+  state.questions = JSON.parse(JSON.stringify(QUESTIONS_RAW));
+
+  updateHearts();
+  updateScoreDisplay();
+  updateStreakBadge();
+  updateXP();
+  drawWorldMap(0);
+
+  showScreen('game-screen');
+  loadQuestion(0);
+}
+
+/* ══════════════════════════════════════════════════════════
+   RADAR & RESULTS HELPERS
+══════════════════════════════════════════════════════════ */
+function calcSpeed() {
+  if (state.correctAnswerTimes.length === 0) return 50;
+  const avg = state.correctAnswerTimes.reduce((a, b) => a + b, 0) / state.correctAnswerTimes.length;
+  return Math.min(100, Math.round((avg / 25) * 100));
+}
+
+function calcDepth() {
+  return Math.round((state.specialQCorrect / 3) * 100);
+}
+
+function getPercentile(score) {
+  if (score >= 1200) return { label: 'TOP 5% · ELITE', emoji: '🏆' };
+  if (score >= 1000) return { label: 'TOP 15% · EXPERT', emoji: '⭐' };
+  if (score >= 800)  return { label: 'TOP 30% · SENIOR', emoji: '🔥' };
+  if (score >= 600)  return { label: 'TOP 50% · MID-LEVEL', emoji: '✓' };
+  if (score >= 400)  return { label: 'TOP 70% · JUNIOR', emoji: '→' };
+  return { label: 'TOP 90% · APPRENTICE', emoji: '→' };
+}
+
+function getPerformanceInsight() {
+  const lines = [];
+  const speed = calcSpeed();
+  if (speed > 70) lines.push('⚡ Speed reader — you answer fast and accurately.');
+  if (state.maxStreak >= 5) lines.push('🔥 Streak machine — momentum is your superpower.');
+  else if (state.maxStreak >= 3) lines.push('🔥 Building streaks — you have strong momentum.');
+  if (state.lives === 3) lines.push('💎 Flawless — not a single wrong answer. Exceptionally rare.');
+  if (state.totalCorrect >= 9 && lines.length < 2) lines.push('★ Near-perfect accuracy — elite ML intuition.');
+  if (state.totalCorrect <= 4 && lines.length < 2) lines.push('→ Keep learning — every expert was once a beginner.');
+  return lines.slice(0, 2).join('<br>') || '→ Solid effort — review the concepts and try again!';
+}
+
+function renderRadarChart() {
+  const canvas = document.getElementById('radar-canvas');
+  if (!canvas) return;
+  if (window._radarChart) { window._radarChart.destroy(); window._radarChart = null; }
+
+  const radarData = [
+    calcSpeed(),
+    Math.round((state.totalCorrect / 10) * 100),
+    Math.min(Math.round((state.maxStreak / 5) * 100), 100),
+    calcDepth(),
+    Math.round((state.lives / 3) * 100)
+  ];
+
+  window._radarChart = new Chart(canvas, {
+    type: 'radar',
+    data: {
+      labels: ['SPEED', 'ACCURACY', 'STREAK', 'DEPTH', 'RESILIENCE'],
+      datasets: [{
+        label: 'ML PROFILE',
+        data: radarData,
+        borderColor: '#f7d51d',
+        backgroundColor: 'rgba(192,132,252,0.25)',
+        pointBackgroundColor: '#f7d51d',
+        pointBorderColor: '#000',
+        pointRadius: 4
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: { legend: { labels: { color: '#f7d51d', font: { family: 'Press Start 2P', size: 7 } } } },
+      scales: {
+        r: {
+          min: 0, max: 100,
+          grid: { color: '#333' },
+          angleLines: { color: '#444' },
+          pointLabels: { color: '#f7d51d', font: { family: 'Press Start 2P', size: 7 } },
+          ticks: { display: false, stepSize: 20 }
+        }
+      }
+    }
+  });
+}
+
+/* ══════════════════════════════════════════════════════════
+   LINKEDIN SHARE SYSTEM
+══════════════════════════════════════════════════════════ */
+function generateLinkedInPost() {
+  const perc = getPercentile(state.score);
+  const speed = calcSpeed();
+  return `🎮 I scored ${perc.emoji} ${perc.label} on Data Odyssey — an interactive ML quiz.
+
+No React. No frameworks. Just 2,600 lines of vanilla JS.
+
+It covers 10 core ML concepts with live visualizations:
+→ Correlation vs Causation (with animated confounding variable reveal)
+→ Simpson's Paradox (interactive toggle chart)
+→ Overfitting (live loss curve animation)
+→ Survivorship Bias, A/B Testing, R², Accuracy Paradox...
+
+My ML Profile: SPEED ${speed}/100 · ACCURACY ${state.totalCorrect}/10 · STREAK ${state.maxStreak}x max
+
+Try it → [YOUR_LINK_HERE]
+
+What's your rank? Drop it below 👇
+
+#MachineLearning #DataScience #Statistics #JavaScript`;
+}
+
+function downloadScorecard() {
+  const cvs = document.createElement('canvas');
+  cvs.width = 800;
+  cvs.height = 420;
+  const ctx = cvs.getContext('2d');
+
+  // Background
+  ctx.fillStyle = '#0d0017';
+  ctx.fillRect(0, 0, 800, 420);
+
+  // Gold border
+  ctx.strokeStyle = '#f7d51d';
+  ctx.lineWidth = 4;
+  ctx.strokeRect(10, 10, 780, 400);
+
+  // Title
+  ctx.fillStyle = '#f7d51d';
+  ctx.font = 'bold 22px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('DATA ODYSSEY', 400, 55);
+
+  ctx.fillStyle = '#828282';
+  ctx.font = '11px monospace';
+  ctx.fillText('ML APTITUDE REPORT', 400, 80);
+
+  // Score
+  ctx.fillStyle = '#f7d51d';
+  ctx.font = 'bold 38px monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText(formatScore(state.score), 60, 140);
+
+  // Rank
+  ctx.fillStyle = '#c084fc';
+  ctx.font = '13px monospace';
+  ctx.fillText(getRank(state.score), 60, 165);
+
+  // Percentile
+  const perc = getPercentile(state.score);
+  ctx.fillStyle = '#f7d51d';
+  ctx.font = '11px monospace';
+  ctx.fillText(perc.emoji + ' ' + perc.label, 60, 195);
+
+  // Metric bars
+  const metrics = [
+    { label: 'SPEED', value: calcSpeed() },
+    { label: 'ACCURACY', value: Math.round((state.totalCorrect / 10) * 100) },
+    { label: 'STREAK', value: Math.min(Math.round((state.maxStreak / 5) * 100), 100) },
+    { label: 'DEPTH', value: calcDepth() },
+    { label: 'RESILIENCE', value: Math.round((state.lives / 3) * 100) }
+  ];
+
+  metrics.forEach((m, i) => {
+    const col = i < 3 ? 0 : 1;
+    const row = i < 3 ? i : i - 3;
+    const x = col === 0 ? 60 : 430;
+    const y = 240 + row * 48;
+    const barW = 270;
+
+    ctx.fillStyle = '#828282';
+    ctx.font = '9px monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText(m.label, x, y);
+
+    ctx.fillStyle = '#1a0a2e';
+    ctx.fillRect(x, y + 6, barW, 14);
+
+    ctx.fillStyle = '#f7d51d';
+    ctx.fillRect(x, y + 6, Math.round(barW * m.value / 100), 14);
+
+    ctx.fillStyle = '#fff';
+    ctx.font = '8px monospace';
+    ctx.fillText(m.value + '%', x + barW + 5, y + 17);
+  });
+
+  // Footer
+  ctx.fillStyle = '#555';
+  ctx.font = '9px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('Built in Vanilla JS · Zero Dependencies · One File', 400, 405);
+
+  cvs.toBlob(blob => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'data-odyssey-scorecard.png';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+}
+
+/* ══════════════════════════════════════════════════════════
+   EVENT LISTENERS
+══════════════════════════════════════════════════════════ */
+document.getElementById('start-btn').addEventListener('click', () => {
+  unlockAudio();
+  startGame();
+});
+
+document.getElementById('next-btn').addEventListener('click', () => {
+  unlockAudio();
+  document.getElementById('next-btn').classList.remove('visible');
+  advanceRound();
+});
+
+document.getElementById('play-again-btn').addEventListener('click', () => {
+  rainActive = true;
+  initRain();
+  requestAnimationFrame(animateRain);
+  document.getElementById('flawless-banner').classList.remove('visible');
+  showScreen('intro-screen');
+  drawWorldMap(0);
+});
+
+document.getElementById('share-linkedin-btn').addEventListener('click', () => {
+  const post = generateLinkedInPost();
+  navigator.clipboard.writeText(post).then(() => {
+    showAchievement('✓ POST COPIED! Paste it on LinkedIn →');
+  }).catch(() => {
+    // Fallback: open a textarea with the text
+    const ta = document.createElement('textarea');
+    ta.value = post;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    showAchievement('✓ POST COPIED! Paste it on LinkedIn →');
+  });
+});
+
+document.getElementById('download-scorecard-btn').addEventListener('click', () => {
+  downloadScorecard();
+});
+
+document.getElementById('audio-btn').addEventListener('click', () => {
+  state.audioEnabled = !state.audioEnabled;
+  document.getElementById('audio-btn').textContent = state.audioEnabled ? '♪ ON' : '♪ OFF';
+  if (state.audioEnabled) unlockAudio();
+});
+
+/* ══════════════════════════════════════════════════════════
+   STARTUP
+══════════════════════════════════════════════════════════ */
+initRain();
+requestAnimationFrame(animateRain);
+drawWorldMap(0);
+</script>
+</body>
+</html>
