@@ -64,5 +64,3 @@ data-odyssey/
 ```
 
 ---
-
-Built with [Claude Code](https://claude.ai/code)
